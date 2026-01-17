@@ -1,18 +1,33 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+
 import MainTabNavigator from "@/navigation/MainTabNavigator";
-import ModalScreen from "@/screens/ModalScreen";
+import TopicDetailScreen from "@/screens/TopicDetailScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
+
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: number;
+}
+
+interface Conversation {
+  id: string;
+  title: string;
+  messages: Message[];
+  createdAt: number;
+}
 
 export type RootStackParamList = {
   Main: undefined;
-  Modal: undefined;
+  TopicDetail: { conversation: Conversation };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootStackNavigator() {
-  const screenOptions = useScreenOptions();
+  const screenOptions = useScreenOptions({ transparent: false });
 
   return (
     <Stack.Navigator screenOptions={screenOptions}>
@@ -22,12 +37,11 @@ export default function RootStackNavigator() {
         options={{ headerShown: false }}
       />
       <Stack.Screen
-        name="Modal"
-        component={ModalScreen}
-        options={{
-          presentation: "modal",
-          headerTitle: "Modal",
-        }}
+        name="TopicDetail"
+        component={TopicDetailScreen}
+        options={({ route }) => ({
+          title: route.params.conversation.title.slice(0, 25) + (route.params.conversation.title.length > 25 ? "..." : ""),
+        })}
       />
     </Stack.Navigator>
   );

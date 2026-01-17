@@ -1,10 +1,9 @@
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/useColorScheme";
 
 export function useTheme() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const theme = Colors[colorScheme ?? "light"];
+  // Always use dark theme for GARY app
+  const isDark = true;
+  const theme = Colors.dark;
 
   return {
     theme,
