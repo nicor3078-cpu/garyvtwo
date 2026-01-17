@@ -38,8 +38,15 @@ interface Conversation {
   createdAt: number;
 }
 
+interface DailyQuestionCount {
+  date: string;
+  count: number;
+}
+
 const STORAGE_KEY = "gary_conversations";
 const CURRENT_CONVERSATION_KEY = "gary_current_conversation";
+const DAILY_QUESTIONS_KEY = "gary_daily_questions";
+const MAX_DAILY_QUESTIONS = 10;
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
@@ -51,13 +58,67 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [questionsRemaining, setQuestionsRemaining] = useState(MAX_DAILY_QUESTIONS);
   const flatListRef = useRef<FlatList>(null);
 
   useFocusEffect(
     useCallback(() => {
       loadCurrentConversation();
+      loadDailyQuestionCount();
     }, [])
   );
+
+  const getTodayDateString = (): string => {
+    return new Date().toISOString().split("T")[0];
+  };
+
+  const loadDailyQuestionCount = async () => {
+    try {
+      const data = await AsyncStorage.getItem(DAILY_QUESTIONS_KEY);
+      if (data) {
+        const parsed: DailyQuestionCount = JSON.parse(data);
+        if (parsed.date === getTodayDateString()) {
+          setQuestionsRemaining(MAX_DAILY_QUESTIONS - parsed.count);
+        } else {
+          setQuestionsRemaining(MAX_DAILY_QUESTIONS);
+          await AsyncStorage.setItem(
+            DAILY_QUESTIONS_KEY,
+            JSON.stringify({ date: getTodayDateString(), count: 0 })
+          );
+        }
+      } else {
+        setQuestionsRemaining(MAX_DAILY_QUESTIONS);
+      }
+    } catch (error) {
+      console.error("Error loading daily question count:", error);
+    }
+  };
+
+  const incrementDailyQuestionCount = async (): Promise<boolean> => {
+    try {
+      const data = await AsyncStorage.getItem(DAILY_QUESTIONS_KEY);
+      let current: DailyQuestionCount = { date: getTodayDateString(), count: 0 };
+      
+      if (data) {
+        const parsed: DailyQuestionCount = JSON.parse(data);
+        if (parsed.date === getTodayDateString()) {
+          current = parsed;
+        }
+      }
+
+      if (current.count >= MAX_DAILY_QUESTIONS) {
+        return false;
+      }
+
+      current.count += 1;
+      await AsyncStorage.setItem(DAILY_QUESTIONS_KEY, JSON.stringify(current));
+      setQuestionsRemaining(MAX_DAILY_QUESTIONS - current.count);
+      return true;
+    } catch (error) {
+      console.error("Error incrementing question count:", error);
+      return true;
+    }
+  };
 
   const loadCurrentConversation = async () => {
     try {
@@ -71,7 +132,6 @@ export default function ChatScreen() {
           return;
         }
       }
-      // No current conversation, start fresh
       setConversationId(null);
       setMessages([]);
     } catch (error) {
@@ -143,6 +203,8 @@ export default function ChatScreen() {
   const sendMessage = async () => {
     if (!inputText.trim() || isLoading) return;
 
+    const canAsk = await incrementDailyQuestionCount();
+    
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
@@ -157,6 +219,20 @@ export default function ChatScreen() {
 
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    if (!canAsk) {
+      const limitMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "Kid, no more questions until tomorrow! You've used up all 10 of your daily questions. Get some rest and come back fresh tomorrow - I'll be here waiting to help you learn more!\n\n**Dad's Summary:**\n- You've reached your daily limit of 10 questions\n- Questions reset at midnight\n- Come back tomorrow for more learning!",
+        timestamp: Date.now(),
+      };
+      const updatedMessages = [...newMessages, limitMessage];
+      setMessages(updatedMessages);
+      await saveConversation(updatedMessages);
+      setIsLoading(false);
+      return;
     }
 
     try {
@@ -214,23 +290,30 @@ export default function ChatScreen() {
       behavior="padding"
       keyboardVerticalOffset={0}
     >
-      <Pressable
-        onPress={shareApp}
-        style={({ pressed }) => [
-          styles.shareButton,
-          { 
-            top: headerHeight + Spacing.sm,
-            opacity: pressed ? 0.7 : 1,
-            borderColor: theme.accent,
-          },
-        ]}
-        testID="button-share"
-      >
-        <Feather name="share-2" size={16} color={theme.accent} />
-        <ThemedText style={[styles.shareButtonText, { color: theme.accent }]}>
-          Share App
-        </ThemedText>
-      </Pressable>
+      <View style={[styles.headerButtons, { top: headerHeight + Spacing.sm }]}>
+        <View style={[styles.questionsCounter, { backgroundColor: theme.backgroundSecondary }]}>
+          <Feather name="help-circle" size={14} color={questionsRemaining > 0 ? theme.accent : theme.error} />
+          <ThemedText style={[styles.questionsCounterText, { color: questionsRemaining > 0 ? theme.accent : theme.error }]}>
+            {questionsRemaining} left today
+          </ThemedText>
+        </View>
+        <Pressable
+          onPress={shareApp}
+          style={({ pressed }) => [
+            styles.shareButton,
+            { 
+              opacity: pressed ? 0.7 : 1,
+              borderColor: theme.accent,
+            },
+          ]}
+          testID="button-share"
+        >
+          <Feather name="share-2" size={16} color={theme.accent} />
+          <ThemedText style={[styles.shareButtonText, { color: theme.accent }]}>
+            Share
+          </ThemedText>
+        </Pressable>
+      </View>
 
       <FlatList
         ref={flatListRef}
@@ -242,7 +325,7 @@ export default function ChatScreen() {
           styles.messageList,
           {
             paddingTop: tabBarHeight + Spacing.lg,
-            paddingBottom: headerHeight + Spacing["3xl"],
+            paddingBottom: headerHeight + Spacing["4xl"],
           },
         ]}
         scrollIndicatorInsets={{ bottom: insets.bottom }}
@@ -281,21 +364,22 @@ export default function ChatScreen() {
               color: theme.text,
             },
           ]}
-          placeholder="Ask GARY anything..."
+          placeholder={questionsRemaining > 0 ? "Ask GARY anything..." : "No questions left today..."}
           placeholderTextColor={theme.textSecondary}
           value={inputText}
           onChangeText={setInputText}
           multiline
           maxLength={2000}
+          editable={questionsRemaining > 0}
           testID="input-message"
         />
         <Pressable
           onPress={sendMessage}
-          disabled={!inputText.trim() || isLoading}
+          disabled={!inputText.trim() || isLoading || questionsRemaining <= 0}
           style={({ pressed }) => [
             styles.sendButton,
             {
-              backgroundColor: inputText.trim() && !isLoading ? theme.accent : theme.backgroundTertiary,
+              backgroundColor: inputText.trim() && !isLoading && questionsRemaining > 0 ? theme.accent : theme.backgroundTertiary,
               opacity: pressed ? 0.8 : 1,
             },
           ]}
@@ -304,7 +388,7 @@ export default function ChatScreen() {
           <Feather
             name="send"
             size={20}
-            color={inputText.trim() && !isLoading ? theme.buttonText : theme.textSecondary}
+            color={inputText.trim() && !isLoading && questionsRemaining > 0 ? theme.buttonText : theme.textSecondary}
           />
         </Pressable>
       </View>
@@ -316,10 +400,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  shareButton: {
+  headerButtons: {
     position: "absolute",
     right: Spacing.lg,
     zIndex: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  questionsCounter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.xs,
+  },
+  questionsCounterText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  shareButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
