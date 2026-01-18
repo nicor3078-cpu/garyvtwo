@@ -22,7 +22,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ChatBubble } from "@/components/ChatBubble";
 import { EmptyState } from "@/components/EmptyState";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
-import { apiRequest } from "@/lib/query-client";
+import { askGary } from "@/lib/gemini";
 
 interface Message {
   id: string;
@@ -236,20 +236,18 @@ export default function ChatScreen() {
     }
 
     try {
-      const response = await apiRequest("POST", "/api/chat", {
-        message: userMessage.content,
-        history: newMessages.slice(-10).map((m) => ({
+      const responseText = await askGary(
+        userMessage.content,
+        newMessages.slice(-10).map((m) => ({
           role: m.role,
           content: m.content,
-        })),
-      });
-
-      const data = await response.json();
+        }))
+      );
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.response,
+        content: responseText,
         timestamp: Date.now(),
       };
 

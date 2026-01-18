@@ -10,14 +10,17 @@
     },
     "preview": {
       "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://gary-decoder.replit.app"
+        "EXPO_PUBLIC_API_KEY": "[PASTE_YOUR_GEMINI_API_KEY_HERE]"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://gary-decoder.replit.app"
+        "EXPO_PUBLIC_API_KEY": "[PASTE_YOUR_GEMINI_API_KEY_HERE]"
       }
     }
   },
