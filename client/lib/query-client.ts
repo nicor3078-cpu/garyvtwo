@@ -1,19 +1,29 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 /**
- * Gets the base URL for the Express API server (e.g., "http://localhost:3000")
+ * Gets the base URL for the Express API server
+ * In development: uses EXPO_PUBLIC_DOMAIN from environment
+ * In production: uses EXPO_PUBLIC_API_URL or falls back to the deployed Replit URL
  * @returns {string} The API base URL
  */
 export function getApiUrl(): string {
-  let host = process.env.EXPO_PUBLIC_DOMAIN;
-
-  if (!host) {
-    throw new Error("EXPO_PUBLIC_DOMAIN is not set");
+  // First check for explicit API URL (set during build for production)
+  const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (apiUrl) {
+    return apiUrl.endsWith('/') ? apiUrl : `${apiUrl}/`;
   }
 
-  let url = new URL(`https://${host}`);
+  // Fall back to domain-based URL (development)
+  const host = process.env.EXPO_PUBLIC_DOMAIN;
+  if (host) {
+    const url = new URL(`https://${host}`);
+    return url.href;
+  }
 
-  return url.href;
+  // Final fallback for standalone builds - this should be updated after publishing
+  // If you're building an APK, set EXPO_PUBLIC_API_URL to your deployed Replit URL
+  console.warn("No API URL configured - using placeholder. Set EXPO_PUBLIC_API_URL for production builds.");
+  return "https://gary-decoder.replit.app/";
 }
 
 async function throwIfResNotOk(res: Response) {
