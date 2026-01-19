@@ -14,13 +14,13 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_KEY": "[PASTE_YOUR_GEMINI_API_KEY_HERE]"
+        "EXPO_PUBLIC_API_KEY": "AIzaSyDINRsKFc6aEGPix3O_dFvlzvqNigtPnnA"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_KEY": "[PASTE_YOUR_GEMINI_API_KEY_HERE]"
+        "EXPO_PUBLIC_API_KEY":"AIzaSyDINRsKFc6aEGPix3O_dFvlzvqNigtPnnA"
       }
     }
   },
