@@ -69,7 +69,19 @@ export default function ChatScreen() {
   );
 
   const getTodayDateString = (): string => {
-    return new Date().toISOString().split("T")[0];
+    // Use local device time for reset logic
+    // Reset happens at 3:00 AM local time, so before 3 AM counts as previous day
+    const now = new Date();
+    const hours = now.getHours();
+    
+    // If before 3 AM, treat as previous day for reset purposes
+    if (hours < 3) {
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      return yesterday.toLocaleDateString();
+    }
+    
+    return now.toLocaleDateString();
   };
 
   const loadDailyQuestionCount = async () => {
