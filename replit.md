@@ -1,10 +1,10 @@
-# GARY: The Subject Decoder
+# GARY: The Subject Decoder (V2)
 
 ## Overview
 
-GARY is a mobile tutoring application that uses the Feynman Technique to explain complex subjects through simple analogies. The app features a fatherly, approachable AI tutor personality that breaks down concepts into digestible explanations, always ending with a signature "Dad's Summary" containing exactly 3 bullet points.
+GARY is a mobile tutoring application that uses the Feynman Technique to explain complex subjects through simple analogies. The app features a wise, fatherly AI tutor personality that breaks down concepts into digestible explanations, always ending with a structured "Dad's Summary" (3 bullets), "Reflexion Questions" (3 numbered questions), and a "Book Recommendation".
 
-The application is built as an Expo React Native app with a Node.js/Express backend, designed to run on iOS, Android, and web platforms. It uses Google's Gemini AI for generating educational responses.
+Built as a **standalone Expo React Native app** (no backend dependency for AI). All AI calls are made directly from the client using the Gemini API.
 
 ## User Preferences
 
@@ -14,70 +14,76 @@ Preferred communication style: Simple, everyday language.
 
 ### Frontend Architecture
 - **Framework**: Expo SDK 54 with React Native 0.81
-- **Navigation**: React Navigation v7 with a tab-based structure
-  - Two main tabs: Chat (home) and History
+- **Navigation**: React Navigation v7 with tab-based structure
+  - Three main tabs: Chat, History, Settings
   - Native stack navigators within each tab
   - Topic Detail screen accessible from History
-- **State Management**: TanStack React Query for server state
-- **Local Storage**: AsyncStorage for conversation persistence on device
-- **Styling**: Dark theme by default with golden accent colors (#FFD700)
+- **State Management**: React local state + AsyncStorage
+- **Local Storage**: AsyncStorage for conversation persistence, API key, memory vault
+- **Styling**: Dark navy/black theme (#0A0E18) with neon blue accent (#00AAFF)
 - **Key UI Components**:
-  - ChatBubble with special "Dad's Summary" parsing
-  - Custom themed components (ThemedText, ThemedView, Button, Card)
-  - Keyboard-aware input handling with react-native-keyboard-controller
+  - ChatBubble with Dad's Summary, Reflexion Questions, Book Recommendation parsing
+  - MarkdownText - custom markdown renderer (bold, italic, code, headers, lists)
+  - DadsSummary - renders all three structured response sections
+  - Copy buttons on every message
+  - Image picker for photo analysis
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express 5
-- **API Structure**: RESTful endpoints under `/api/` prefix
-- **AI Integration**: Google Gemini via Replit AI Integrations
-  - Custom system prompt defining GARY's personality and response format
-  - Chat endpoint at `/api/chat` for conversation handling
-- **CORS**: Dynamic origin handling for Replit domains and localhost development
+- **Role**: Minimal - serves static Expo files and landing page only
+- **AI calls go directly from client** to Gemini API
 
-### Data Storage
-- **Database**: PostgreSQL with Drizzle ORM
-- **Schema Location**: `shared/schema.ts` and `shared/models/chat.ts`
-- **Tables**:
-  - `users`: Basic user authentication (id, username, password)
-  - `conversations`: Chat session metadata (id, title, createdAt)
-  - `messages`: Individual messages (id, conversationId, role, content, createdAt)
-- **Client-side**: AsyncStorage for current conversation and daily question limits
-  - `gary_conversations`: All saved conversations
-  - `gary_current_conversation`: ID of active conversation
-  - `gary_daily_questions`: Daily question count with date (resets at midnight)
+### Data Storage (All Client-Side)
+- `gary_conversations` - All saved conversations
+- `gary_current_conversation` - ID of active conversation
+- `gary_user_api_key` - User's own Gemini API key (BYOAK)
+- `gary_memory_vault` - User profile (name, grade, birthday, interests)
 
-### Daily Question Limit
-- Users can ask GARY a maximum of 10 questions per day
-- Counter displayed in the header showing remaining questions
-- When limit is reached, GARY responds: "Kid, no more questions until tomorrow!"
-- Counter resets automatically at midnight (based on device date)
+### Storage Module (`client/lib/storage.ts`)
+Centralized storage utilities for API key and memory vault CRUD.
+
+### Gemini Integration (`client/lib/gemini.ts`)
+- **BYOAK**: User's custom API key takes priority, falls back to built-in key pool
+- **Auto-retry**: Up to 3 retries with exponential backoff for 429/503/502 errors
+- **Temporal awareness**: Current date/time injected into every system prompt
+- **Memory personalization**: Student profile from memory vault included in system prompt
+- **Cancellation**: AbortController support for cancelling in-flight requests
+- **Image analysis**: Supports base64 image attachments (Gemini Vision)
+
+### V2 Features
+1. **Neon Blue Theme**: Dark (#0A0E18) background with #00AAFF accent
+2. **BYOAK Settings**: Users paste their own Gemini API key with validation
+3. **Memory Vault**: Save name, grade, birthday, interests for personalized responses
+4. **No question limit**: Unlimited questions (removed 10/day cap)
+5. **Markdown rendering**: Custom renderer for bold, italic, code blocks, headers, lists
+6. **Copy buttons**: On every message and on the Dad's Summary
+7. **Auto-retry**: 3 retries with backoff on API errors
+8. **Reflexion Questions**: 3 numbered follow-up questions after each explanation
+9. **Book Recommendations**: One book suggestion after each explanation
+10. **Temporal awareness**: GARY knows today's date and time
+11. **Image analysis**: Pick a photo from gallery for GARY to analyze
+12. **New conversation button**: Top-right "New" button to clear chat
 
 ### Path Aliases
 - `@/` maps to `./client/`
-- `@shared/` maps to `./shared/`
 
 ### Build & Development
 - **Development**: Separate processes for Expo (`expo:dev`) and server (`server:dev`)
-- **Production**: Static web build with esbuild for server bundling
-- **Database Migrations**: Drizzle Kit with `db:push` command
+- **Frontend**: Port 8081 (Expo Metro)
+- **Backend**: Port 5000 (Express, serves static files + landing page)
 
 ## External Dependencies
 
 ### AI Services
-- **Google Gemini** via Replit AI Integrations
-  - Environment variables: `AI_INTEGRATIONS_GEMINI_API_KEY`, `AI_INTEGRATIONS_GEMINI_BASE_URL`
-  - Models used: `gemini-2.5-flash` for chat responses
-  - Additional capability: Image generation with `gemini-2.5-flash-image`
-
-### Database
-- **PostgreSQL**: Connection via `DATABASE_URL` environment variable
-- **ORM**: Drizzle ORM with drizzle-zod for schema validation
+- **Google Gemini 2.5 Flash** - direct from client
+  - Built-in pool of API keys as fallback
+  - Users can supply their own key via Settings (BYOAK)
+  - Image analysis via Gemini Vision (base64 inline data)
 
 ### Key NPM Packages
 - `expo` ecosystem for cross-platform mobile development
 - `@react-navigation/*` for navigation
-- `@tanstack/react-query` for data fetching
-- `react-native-reanimated` for animations
+- `expo-clipboard` for copy-to-clipboard
+- `expo-image-picker` for photo selection
 - `react-native-keyboard-controller` for keyboard handling
 - `express` for HTTP server
-- `drizzle-orm` and `pg` for database operations

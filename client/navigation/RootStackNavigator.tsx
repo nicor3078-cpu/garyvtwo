@@ -4,13 +4,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import MainTabNavigator from "@/navigation/MainTabNavigator";
 import TopicDetailScreen from "@/screens/TopicDetailScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
-
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: number;
-}
+import { Message } from "@/components/ChatBubble";
 
 interface Conversation {
   id: string;
@@ -40,7 +34,9 @@ export default function RootStackNavigator() {
         name="TopicDetail"
         component={TopicDetailScreen}
         options={({ route }) => ({
-          title: route.params.conversation.title.slice(0, 25) + (route.params.conversation.title.length > 25 ? "..." : ""),
+          title:
+            route.params.conversation.title.slice(0, 28) +
+            (route.params.conversation.title.length > 28 ? "..." : ""),
         })}
       />
     </Stack.Navigator>

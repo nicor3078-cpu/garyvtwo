@@ -6,7 +6,6 @@ import {
   Pressable,
   StyleSheet,
   Platform,
-  Share,
   ActivityIndicator,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
@@ -16,20 +15,15 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { ThemedText } from "@/components/ThemedText";
-import { ChatBubble } from "@/components/ChatBubble";
+import { ChatBubble, Message } from "@/components/ChatBubble";
 import { EmptyState } from "@/components/EmptyState";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
-import { askGary } from "@/lib/gemini";
-
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: number;
-}
+import { askGary, ImageAttachment } from "@/lib/gemini";
+import { KEYS } from "@/lib/storage";
 
 interface Conversation {
   id: string;
@@ -38,103 +32,38 @@ interface Conversation {
   createdAt: number;
 }
 
-interface DailyQuestionCount {
-  date: string;
-  count: number;
+function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
-
-const STORAGE_KEY = "gary_conversations";
-const CURRENT_CONVERSATION_KEY = "gary_current_conversation";
-const DAILY_QUESTIONS_KEY = "gary_daily_questions";
-const MAX_DAILY_QUESTIONS = 10;
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
   const theme = Colors.dark;
-  
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [questionsRemaining, setQuestionsRemaining] = useState(MAX_DAILY_QUESTIONS);
+  const [pendingImage, setPendingImage] = useState<{
+    uri: string;
+    base64: string;
+    mimeType: string;
+  } | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const abortRef = useRef<AbortController | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   useFocusEffect(
     useCallback(() => {
       loadCurrentConversation();
-      loadDailyQuestionCount();
     }, [])
   );
 
-  const getTodayDateString = (): string => {
-    // Use local device time for reset logic
-    // Reset happens at 3:00 AM local time, so before 3 AM counts as previous day
-    const now = new Date();
-    const hours = now.getHours();
-    
-    // If before 3 AM, treat as previous day for reset purposes
-    if (hours < 3) {
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
-      return yesterday.toLocaleDateString();
-    }
-    
-    return now.toLocaleDateString();
-  };
-
-  const loadDailyQuestionCount = async () => {
-    try {
-      const data = await AsyncStorage.getItem(DAILY_QUESTIONS_KEY);
-      if (data) {
-        const parsed: DailyQuestionCount = JSON.parse(data);
-        if (parsed.date === getTodayDateString()) {
-          setQuestionsRemaining(MAX_DAILY_QUESTIONS - parsed.count);
-        } else {
-          setQuestionsRemaining(MAX_DAILY_QUESTIONS);
-          await AsyncStorage.setItem(
-            DAILY_QUESTIONS_KEY,
-            JSON.stringify({ date: getTodayDateString(), count: 0 })
-          );
-        }
-      } else {
-        setQuestionsRemaining(MAX_DAILY_QUESTIONS);
-      }
-    } catch (error) {
-      console.error("Error loading daily question count:", error);
-    }
-  };
-
-  const incrementDailyQuestionCount = async (): Promise<boolean> => {
-    try {
-      const data = await AsyncStorage.getItem(DAILY_QUESTIONS_KEY);
-      let current: DailyQuestionCount = { date: getTodayDateString(), count: 0 };
-      
-      if (data) {
-        const parsed: DailyQuestionCount = JSON.parse(data);
-        if (parsed.date === getTodayDateString()) {
-          current = parsed;
-        }
-      }
-
-      if (current.count >= MAX_DAILY_QUESTIONS) {
-        return false;
-      }
-
-      current.count += 1;
-      await AsyncStorage.setItem(DAILY_QUESTIONS_KEY, JSON.stringify(current));
-      setQuestionsRemaining(MAX_DAILY_QUESTIONS - current.count);
-      return true;
-    } catch (error) {
-      console.error("Error incrementing question count:", error);
-      return true;
-    }
-  };
-
   const loadCurrentConversation = async () => {
     try {
-      const currentId = await AsyncStorage.getItem(CURRENT_CONVERSATION_KEY);
+      const currentId = await AsyncStorage.getItem(KEYS.CURRENT_CONVERSATION);
       if (currentId) {
         const conversations = await loadConversations();
         const conversation = conversations.find((c) => c.id === currentId);
@@ -153,7 +82,7 @@ export default function ChatScreen() {
 
   const loadConversations = async (): Promise<Conversation[]> => {
     try {
-      const data = await AsyncStorage.getItem(STORAGE_KEY);
+      const data = await AsyncStorage.getItem(KEYS.CONVERSATIONS);
       return data ? JSON.parse(data) : [];
     } catch {
       return [];
@@ -164,11 +93,11 @@ export default function ChatScreen() {
     try {
       const conversations = await loadConversations();
       let convId = conversationId;
-      
+
       if (!convId) {
-        convId = Date.now().toString();
+        convId = generateId();
         setConversationId(convId);
-        await AsyncStorage.setItem(CURRENT_CONVERSATION_KEY, convId);
+        await AsyncStorage.setItem(KEYS.CURRENT_CONVERSATION, convId);
       }
 
       const existingIndex = conversations.findIndex((c) => c.id === convId);
@@ -176,7 +105,8 @@ export default function ChatScreen() {
         id: convId,
         title: title || extractTitle(msgs),
         messages: msgs,
-        createdAt: existingIndex >= 0 ? conversations[existingIndex].createdAt : Date.now(),
+        createdAt:
+          existingIndex >= 0 ? conversations[existingIndex].createdAt : Date.now(),
       };
 
       if (existingIndex >= 0) {
@@ -185,7 +115,7 @@ export default function ChatScreen() {
         conversations.unshift(conversation);
       }
 
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+      await AsyncStorage.setItem(KEYS.CONVERSATIONS, JSON.stringify(conversations));
     } catch (error) {
       console.error("Error saving conversation:", error);
     }
@@ -194,70 +124,86 @@ export default function ChatScreen() {
   const extractTitle = (msgs: Message[]): string => {
     const firstUserMessage = msgs.find((m) => m.role === "user");
     if (firstUserMessage) {
-      return firstUserMessage.content.slice(0, 50) + (firstUserMessage.content.length > 50 ? "..." : "");
+      return (
+        firstUserMessage.content.slice(0, 60) +
+        (firstUserMessage.content.length > 60 ? "..." : "")
+      );
     }
     return "New Conversation";
   };
 
-  const shareApp = async () => {
-    try {
-      const domain = process.env.EXPO_PUBLIC_DOMAIN;
-      const shareUrl = domain ? `https://${domain}` : "https://replit.com";
-      await Share.share({
-        message: `Check out GARY: The Subject Decoder! Your personal AI tutor that explains complex subjects in simple terms. Download here: ${shareUrl}`,
-        title: "GARY: The Subject Decoder",
-      });
-    } catch (error) {
-      console.error("Error sharing:", error);
+  const startNewConversation = async () => {
+    abortRef.current?.abort();
+    setMessages([]);
+    setConversationId(null);
+    setPendingImage(null);
+    setInputText("");
+    setIsLoading(false);
+    await AsyncStorage.removeItem(KEYS.CURRENT_CONVERSATION);
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      const base64 = asset.base64 || "";
+      const mimeType = asset.mimeType || "image/jpeg";
+      setPendingImage({ uri: asset.uri, base64, mimeType });
+      if (Platform.OS !== "web") {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
     }
   };
 
   const sendMessage = async () => {
-    if (!inputText.trim() || isLoading) return;
+    if ((!inputText.trim() && !pendingImage) || isLoading) return;
 
-    const canAsk = await incrementDailyQuestionCount();
-    
+    abortRef.current = new AbortController();
+
+    const imageAttachment: ImageAttachment | undefined = pendingImage
+      ? { base64: pendingImage.base64, mimeType: pendingImage.mimeType }
+      : undefined;
+
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: generateId(),
       role: "user",
-      content: inputText.trim(),
+      content: inputText.trim() || "What can you tell me about this image?",
       timestamp: Date.now(),
+      imageUri: pendingImage?.uri,
     };
 
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInputText("");
+    setPendingImage(null);
     setIsLoading(true);
+    setRetryCount(0);
 
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
 
-    if (!canAsk) {
-      const limitMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: "Kid, no more questions until tomorrow! You've used up all 10 of your daily questions. Get some rest and come back fresh tomorrow - I'll be here waiting to help you learn more!\n\n**Dad's Summary:**\n- You've reached your daily limit of 10 questions\n- Questions reset at midnight\n- Come back tomorrow for more learning!",
-        timestamp: Date.now(),
-      };
-      const updatedMessages = [...newMessages, limitMessage];
-      setMessages(updatedMessages);
-      await saveConversation(updatedMessages);
-      setIsLoading(false);
-      return;
-    }
-
     try {
       const responseText = await askGary(
         userMessage.content,
-        newMessages.slice(-10).map((m) => ({
+        newMessages.slice(-12).map((m) => ({
           role: m.role,
           content: m.content,
-        }))
+        })),
+        imageAttachment,
+        abortRef.current.signal
       );
-      
+
       const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: generateId(),
         role: "assistant",
         content: responseText,
         timestamp: Date.now(),
@@ -270,29 +216,40 @@ export default function ChatScreen() {
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-    } catch (error) {
-      console.error("Error sending message:", error);
+    } catch (error: any) {
+      if (error?.name === "AbortError" || error?.message === "Request cancelled") {
+        setIsLoading(false);
+        return;
+      }
+
       const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: generateId(),
         role: "assistant",
-        content: "I apologize, but I encountered an error. Please try again in a moment.",
+        content:
+          "Something went wrong on my end. Check your connection and try again. I'm not going anywhere.",
         timestamp: Date.now(),
       };
       const updatedMessages = [...newMessages, errorMessage];
       setMessages(updatedMessages);
+      await saveConversation(updatedMessages);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const cancelRequest = () => {
+    abortRef.current?.abort();
+    setIsLoading(false);
+  };
+
   const renderMessage = useCallback(
-    ({ item }: { item: Message }) => (
-      <ChatBubble message={item} />
-    ),
+    ({ item }: { item: Message }) => <ChatBubble message={item} />,
     []
   );
 
   const keyExtractor = useCallback((item: Message) => item.id, []);
+
+  const canSend = (inputText.trim().length > 0 || pendingImage !== null) && !isLoading;
 
   return (
     <KeyboardAvoidingView
@@ -300,27 +257,22 @@ export default function ChatScreen() {
       behavior="padding"
       keyboardVerticalOffset={0}
     >
-      <View style={[styles.headerButtons, { top: headerHeight + Spacing.sm }]}>
-        <View style={[styles.questionsCounter, { backgroundColor: theme.backgroundSecondary }]}>
-          <Feather name="help-circle" size={14} color={questionsRemaining > 0 ? theme.accent : theme.error} />
-          <ThemedText style={[styles.questionsCounterText, { color: questionsRemaining > 0 ? theme.accent : theme.error }]}>
-            {questionsRemaining} left today
-          </ThemedText>
-        </View>
+      <View style={[styles.headerActions, { top: headerHeight + Spacing.sm }]}>
         <Pressable
-          onPress={shareApp}
+          onPress={startNewConversation}
           style={({ pressed }) => [
-            styles.shareButton,
-            { 
+            styles.headerBtn,
+            {
+              backgroundColor: theme.backgroundSecondary,
+              borderColor: theme.border,
               opacity: pressed ? 0.7 : 1,
-              borderColor: theme.accent,
             },
           ]}
-          testID="button-share"
+          testID="button-new-chat"
         >
-          <Feather name="share-2" size={16} color={theme.accent} />
-          <ThemedText style={[styles.shareButtonText, { color: theme.accent }]}>
-            Share
+          <Feather name="plus" size={15} color={theme.accent} />
+          <ThemedText style={[styles.headerBtnText, { color: theme.accent }]}>
+            New
           </ThemedText>
         </Pressable>
       </View>
@@ -342,19 +294,54 @@ export default function ChatScreen() {
         ListEmptyComponent={
           <EmptyState
             icon="book-open"
-            title="Ask GARY about any subject"
-            subtitle="Your wise, fatherly tutor is here to explain complex topics in simple terms using the Feynman Technique."
+            title="Ask GARY anything"
+            subtitle="Your wise, fatherly AI tutor explains complex topics simply using the Feynman Technique. No question limit."
           />
         }
         ListFooterComponent={
           isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={theme.accent} />
-              <ThemedText style={styles.loadingText}>GARY is thinking...</ThemedText>
+              <ThemedText style={[styles.loadingText, { color: theme.textSecondary }]}>
+                GARY is thinking...
+              </ThemedText>
+              <Pressable
+                onPress={cancelRequest}
+                style={({ pressed }) => ({
+                  opacity: pressed ? 0.5 : 1,
+                  padding: Spacing.xs,
+                })}
+                testID="button-cancel"
+              >
+                <Feather name="x" size={14} color={theme.textSecondary} />
+              </Pressable>
             </View>
           ) : null
         }
       />
+
+      {pendingImage ? (
+        <View
+          style={[
+            styles.imagePreviewBar,
+            { backgroundColor: theme.backgroundSecondary, borderTopColor: theme.border },
+          ]}
+        >
+          <Feather name="image" size={14} color={theme.accent} />
+          <ThemedText
+            style={[styles.imagePreviewText, { color: theme.textSecondary }]}
+          >
+            Image attached
+          </ThemedText>
+          <Pressable
+            onPress={() => setPendingImage(null)}
+            style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+            testID="button-remove-image"
+          >
+            <Feather name="x" size={14} color={theme.error} />
+          </Pressable>
+        </View>
+      ) : null}
 
       <View
         style={[
@@ -366,30 +353,46 @@ export default function ChatScreen() {
           },
         ]}
       >
+        <Pressable
+          onPress={pickImage}
+          style={({ pressed }) => [
+            styles.iconBtn,
+            {
+              backgroundColor: theme.backgroundSecondary,
+              opacity: pressed ? 0.6 : 1,
+            },
+          ]}
+          testID="button-pick-image"
+        >
+          <Feather name="image" size={18} color={theme.textSecondary} />
+        </Pressable>
+
         <TextInput
           style={[
             styles.input,
             {
               backgroundColor: theme.backgroundSecondary,
               color: theme.text,
+              borderColor: theme.border,
             },
           ]}
-          placeholder={questionsRemaining > 0 ? "Ask GARY anything..." : "No questions left today..."}
+          placeholder="Ask GARY anything..."
           placeholderTextColor={theme.textSecondary}
           value={inputText}
           onChangeText={setInputText}
           multiline
-          maxLength={2000}
-          editable={questionsRemaining > 0}
+          maxLength={4000}
           testID="input-message"
+          onSubmitEditing={Platform.OS === "web" ? sendMessage : undefined}
         />
+
         <Pressable
           onPress={sendMessage}
-          disabled={!inputText.trim() || isLoading || questionsRemaining <= 0}
+          disabled={!canSend}
           style={({ pressed }) => [
             styles.sendButton,
             {
-              backgroundColor: inputText.trim() && !isLoading && questionsRemaining > 0 ? theme.accent : theme.backgroundTertiary,
+              backgroundColor: canSend ? theme.accent : theme.backgroundTertiary,
               opacity: pressed ? 0.8 : 1,
             },
           ]}
@@ -397,8 +400,8 @@ export default function ChatScreen() {
         >
           <Feather
             name="send"
-            size={20}
-            color={inputText.trim() && !isLoading && questionsRemaining > 0 ? theme.buttonText : theme.textSecondary}
+            size={18}
+            color={canSend ? theme.buttonText : theme.textSecondary}
           />
         </Pressable>
       </View>
@@ -410,27 +413,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  headerButtons: {
+  headerActions: {
     position: "absolute",
     right: Spacing.lg,
     zIndex: 10,
     flexDirection: "row",
-    alignItems: "center",
     gap: Spacing.sm,
   },
-  questionsCounter: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.xs,
-  },
-  questionsCounterText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  shareButton: {
+  headerBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
@@ -439,13 +429,13 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xs,
     borderWidth: 1,
   },
-  shareButtonText: {
-    fontSize: 14,
+  headerBtnText: {
+    fontSize: 13,
     fontWeight: "600",
   },
   messageList: {
     flexGrow: 1,
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.md,
   },
   loadingContainer: {
     flexDirection: "row",
@@ -455,31 +445,52 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.lg,
   },
   loadingText: {
-    fontSize: 14,
-    opacity: 0.7,
+    fontSize: 13,
+  },
+  imagePreviewBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderTopWidth: 1,
+  },
+  imagePreviewText: {
+    flex: 1,
+    fontSize: 13,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "flex-end",
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.md,
     paddingTop: Spacing.md,
     borderTopWidth: 1,
     gap: Spacing.sm,
   },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.xs,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
   input: {
     flex: 1,
-    minHeight: 44,
+    minHeight: 40,
     maxHeight: 120,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    fontSize: 16,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: 15,
+    borderWidth: 1,
   },
   sendButton: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: BorderRadius.full,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
   },
 });

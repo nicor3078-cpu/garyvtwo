@@ -6,11 +6,13 @@ import { Platform, StyleSheet } from "react-native";
 
 import ChatStackNavigator from "@/navigation/ChatStackNavigator";
 import HistoryStackNavigator from "@/navigation/HistoryStackNavigator";
+import SettingsStackNavigator from "@/navigation/SettingsStackNavigator";
 import { Colors } from "@/constants/theme";
 
 export type MainTabParamList = {
   ChatTab: undefined;
   HistoryTab: undefined;
+  SettingsTab: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -32,12 +34,13 @@ export default function MainTabNavigator() {
             web: theme.backgroundRoot,
           }),
           borderTopWidth: 0,
+          borderTopColor: "transparent",
           elevation: 0,
         },
         tabBarBackground: () =>
           Platform.OS === "ios" ? (
             <BlurView
-              intensity={100}
+              intensity={90}
               tint="dark"
               style={StyleSheet.absoluteFill}
             />
@@ -62,6 +65,16 @@ export default function MainTabNavigator() {
           title: "History",
           tabBarIcon: ({ color, size }) => (
             <Feather name="clock" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="SettingsTab"
+        component={SettingsStackNavigator}
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="sliders" size={size} color={color} />
           ),
         }}
       />
