@@ -1,6 +1,7 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   View,
+  Text,
   FlatList,
   TextInput,
   Pressable,
@@ -8,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -18,10 +20,9 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { ThemedText } from "@/components/ThemedText";
 import { ChatBubble, Message } from "@/components/ChatBubble";
 import { EmptyState } from "@/components/EmptyState";
-import { Colors, Spacing, BorderRadius } from "@/constants/theme";
+import { Colors, Spacing, BorderRadius, Fonts } from "@/constants/theme";
 import { askGary, ImageAttachment } from "@/lib/gemini";
 import { KEYS } from "@/lib/storage";
 
@@ -51,7 +52,6 @@ export default function ChatScreen() {
     base64: string;
     mimeType: string;
   } | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
@@ -106,7 +106,9 @@ export default function ChatScreen() {
         title: title || extractTitle(msgs),
         messages: msgs,
         createdAt:
-          existingIndex >= 0 ? conversations[existingIndex].createdAt : Date.now(),
+          existingIndex >= 0
+            ? conversations[existingIndex].createdAt
+            : Date.now(),
       };
 
       if (existingIndex >= 0) {
@@ -115,7 +117,10 @@ export default function ChatScreen() {
         conversations.unshift(conversation);
       }
 
-      await AsyncStorage.setItem(KEYS.CONVERSATIONS, JSON.stringify(conversations));
+      await AsyncStorage.setItem(
+        KEYS.CONVERSATIONS,
+        JSON.stringify(conversations)
+      );
     } catch (error) {
       console.error("Error saving conversation:", error);
     }
@@ -185,7 +190,6 @@ export default function ChatScreen() {
     setInputText("");
     setPendingImage(null);
     setIsLoading(true);
-    setRetryCount(0);
 
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -217,7 +221,10 @@ export default function ChatScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (error: any) {
-      if (error?.name === "AbortError" || error?.message === "Request cancelled") {
+      if (
+        error?.name === "AbortError" ||
+        error?.message === "Request cancelled"
+      ) {
         setIsLoading(false);
         return;
       }
@@ -226,7 +233,7 @@ export default function ChatScreen() {
         id: generateId(),
         role: "assistant",
         content:
-          "Something went wrong on my end. Check your connection and try again. I'm not going anywhere.",
+          "Connection error. Check your signal and try again. I'm still here.",
         timestamp: Date.now(),
       };
       const updatedMessages = [...newMessages, errorMessage];
@@ -249,7 +256,8 @@ export default function ChatScreen() {
 
   const keyExtractor = useCallback((item: Message) => item.id, []);
 
-  const canSend = (inputText.trim().length > 0 || pendingImage !== null) && !isLoading;
+  const canSend =
+    (inputText.trim().length > 0 || pendingImage !== null) && !isLoading;
 
   return (
     <KeyboardAvoidingView
@@ -263,17 +271,22 @@ export default function ChatScreen() {
           style={({ pressed }) => [
             styles.headerBtn,
             {
-              backgroundColor: theme.backgroundSecondary,
-              borderColor: theme.border,
-              opacity: pressed ? 0.7 : 1,
+              borderColor: "rgba(0, 170, 255, 0.25)",
+              backgroundColor: "rgba(0, 170, 255, 0.05)",
+              opacity: pressed ? 0.6 : 1,
             },
           ]}
           testID="button-new-chat"
         >
-          <Feather name="plus" size={15} color={theme.accent} />
-          <ThemedText style={[styles.headerBtnText, { color: theme.accent }]}>
-            New
-          </ThemedText>
+          <Feather name="plus" size={13} color={theme.accent} />
+          <Text
+            style={[
+              styles.headerBtnText,
+              { color: theme.accent, fontFamily: Fonts.monoBold },
+            ]}
+          >
+            new
+          </Text>
         </Pressable>
       </View>
 
@@ -293,27 +306,32 @@ export default function ChatScreen() {
         scrollIndicatorInsets={{ bottom: insets.bottom }}
         ListEmptyComponent={
           <EmptyState
-            icon="book-open"
-            title="Ask GARY anything"
-            subtitle="Your wise, fatherly AI tutor explains complex topics simply using the Feynman Technique. No question limit."
+            icon="terminal"
+            title="// ask gary anything"
+            subtitle="Feynman Technique. No limits. Every answer ends with a Summary, Reflexion Questions, and a Book."
           />
         }
         ListFooterComponent={
           isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={theme.accent} />
-              <ThemedText style={[styles.loadingText, { color: theme.textSecondary }]}>
-                GARY is thinking...
-              </ThemedText>
+              <Text
+                style={[
+                  styles.loadingText,
+                  { color: theme.textSecondary, fontFamily: Fonts.mono },
+                ]}
+              >
+                processing...
+              </Text>
               <Pressable
                 onPress={cancelRequest}
                 style={({ pressed }) => ({
-                  opacity: pressed ? 0.5 : 1,
+                  opacity: pressed ? 0.4 : 0.7,
                   padding: Spacing.xs,
                 })}
                 testID="button-cancel"
               >
-                <Feather name="x" size={14} color={theme.textSecondary} />
+                <Feather name="x" size={13} color={theme.textSecondary} />
               </Pressable>
             </View>
           ) : null
@@ -324,86 +342,110 @@ export default function ChatScreen() {
         <View
           style={[
             styles.imagePreviewBar,
-            { backgroundColor: theme.backgroundSecondary, borderTopColor: theme.border },
+            {
+              backgroundColor: theme.backgroundSecondary,
+              borderTopColor: theme.border,
+            },
           ]}
         >
-          <Feather name="image" size={14} color={theme.accent} />
-          <ThemedText
-            style={[styles.imagePreviewText, { color: theme.textSecondary }]}
+          <Feather name="image" size={13} color={theme.accent} />
+          <Text
+            style={[
+              styles.imagePreviewText,
+              { color: theme.textSecondary, fontFamily: Fonts.mono },
+            ]}
           >
-            Image attached
-          </ThemedText>
+            image attached
+          </Text>
           <Pressable
             onPress={() => setPendingImage(null)}
-            style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+            style={({ pressed }) => ({ opacity: pressed ? 0.4 : 1 })}
             testID="button-remove-image"
           >
-            <Feather name="x" size={14} color={theme.error} />
+            <Feather name="x" size={13} color={theme.error} />
           </Pressable>
         </View>
       ) : null}
 
-      <View
-        style={[
-          styles.inputContainer,
-          {
-            backgroundColor: theme.backgroundDefault,
-            paddingBottom: insets.bottom + Spacing.sm,
-            borderTopColor: theme.border,
-          },
-        ]}
-      >
-        <Pressable
-          onPress={pickImage}
-          style={({ pressed }) => [
-            styles.iconBtn,
-            {
-              backgroundColor: theme.backgroundSecondary,
-              opacity: pressed ? 0.6 : 1,
-            },
-          ]}
-          testID="button-pick-image"
-        >
-          <Feather name="image" size={18} color={theme.textSecondary} />
-        </Pressable>
-
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.backgroundSecondary,
-              color: theme.text,
-              borderColor: theme.border,
-            },
-          ]}
-          placeholder="Ask GARY anything..."
-          placeholderTextColor={theme.textSecondary}
-          value={inputText}
-          onChangeText={setInputText}
-          multiline
-          maxLength={4000}
-          testID="input-message"
-          onSubmitEditing={Platform.OS === "web" ? sendMessage : undefined}
-        />
-
-        <Pressable
-          onPress={sendMessage}
-          disabled={!canSend}
-          style={({ pressed }) => [
-            styles.sendButton,
-            {
-              backgroundColor: canSend ? theme.accent : theme.backgroundTertiary,
-              opacity: pressed ? 0.8 : 1,
-            },
-          ]}
-          testID="button-send"
-        >
-          <Feather
-            name="send"
-            size={18}
-            color={canSend ? theme.buttonText : theme.textSecondary}
+      <View style={styles.inputWrapper}>
+        {Platform.OS === "ios" ? (
+          <BlurView
+            intensity={60}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
           />
-        </Pressable>
+        ) : null}
+        <View
+          style={[
+            styles.inputContainer,
+            {
+              paddingBottom: tabBarHeight + insets.bottom + Spacing.sm,
+              backgroundColor:
+                Platform.OS === "ios"
+                  ? "transparent"
+                  : "rgba(5, 8, 16, 0.92)",
+              borderTopColor: "rgba(0, 170, 255, 0.12)",
+            },
+          ]}
+        >
+          <Pressable
+            onPress={pickImage}
+            style={({ pressed }) => [
+              styles.iconBtn,
+              {
+                borderColor: "rgba(0, 170, 255, 0.18)",
+                backgroundColor: "rgba(0, 170, 255, 0.04)",
+                opacity: pressed ? 0.5 : 1,
+              },
+            ]}
+            testID="button-pick-image"
+          >
+            <Feather name="image" size={16} color={theme.textSecondary} />
+          </Pressable>
+
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: "rgba(12, 18, 32, 0.8)",
+                color: theme.text,
+                borderColor: "rgba(0, 170, 255, 0.15)",
+                fontFamily: Fonts.mono,
+              },
+            ]}
+            placeholder="// type here..."
+            placeholderTextColor={theme.textSecondary}
+            value={inputText}
+            onChangeText={setInputText}
+            multiline
+            maxLength={4000}
+            testID="input-message"
+          />
+
+          <Pressable
+            onPress={sendMessage}
+            disabled={!canSend}
+            style={({ pressed }) => [
+              styles.sendButton,
+              {
+                backgroundColor: canSend
+                  ? theme.accent
+                  : "rgba(0, 170, 255, 0.08)",
+                borderColor: canSend
+                  ? theme.accent
+                  : "rgba(0, 170, 255, 0.15)",
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+            testID="button-send"
+          >
+            <Feather
+              name="send"
+              size={16}
+              color={canSend ? theme.buttonText : theme.textSecondary}
+            />
+          </Pressable>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -425,27 +467,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: Spacing.xs,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingVertical: 6,
     borderRadius: BorderRadius.xs,
     borderWidth: 1,
   },
   headerBtnText: {
-    fontSize: 13,
-    fontWeight: "600",
+    fontSize: 12,
+    letterSpacing: 0.5,
   },
   messageList: {
     flexGrow: 1,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.lg,
   },
   loadingContainer: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     gap: Spacing.sm,
     paddingVertical: Spacing.lg,
+    paddingLeft: Spacing.lg,
   },
   loadingText: {
-    fontSize: 13,
+    fontSize: 12,
   },
   imagePreviewBar: {
     flexDirection: "row",
@@ -457,38 +500,46 @@ const styles = StyleSheet.create({
   },
   imagePreviewText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 12,
+  },
+  inputWrapper: {
+    position: "relative",
+    overflow: "hidden",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0, 170, 255, 0.12)",
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "flex-end",
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.md,
-    borderTopWidth: 1,
     gap: Spacing.sm,
   },
   iconBtn: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: BorderRadius.xs,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
   input: {
     flex: 1,
-    minHeight: 40,
-    maxHeight: 120,
+    minHeight: 38,
+    maxHeight: 110,
     borderRadius: BorderRadius.sm,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    fontSize: 15,
+    fontSize: 14,
+    lineHeight: 20,
     borderWidth: 1,
   },
   sendButton: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: BorderRadius.full,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,

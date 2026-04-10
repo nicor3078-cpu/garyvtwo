@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "IFhtaM9teYNTZPgFkbNBt"
+uri = "file://assets/images/icon.png"
+type = "image"
+title = "neon blue colon chevron icon"

@@ -1,11 +1,10 @@
-import React from "react";
-import { View, StyleSheet, Pressable, Platform } from "react-native";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, Pressable, Platform } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 
-import { ThemedText } from "@/components/ThemedText";
-import { Colors, Spacing, BorderRadius } from "@/constants/theme";
+import { Colors, Spacing, BorderRadius, Fonts } from "@/constants/theme";
 
 interface ParsedSections {
   summary: string[];
@@ -19,12 +18,15 @@ interface DadsSummaryProps {
 
 export function DadsSummary({ sections }: DadsSummaryProps) {
   const theme = Colors.dark;
+  const [copiedSummary, setCopiedSummary] = useState(false);
 
   const copyToClipboard = async (text: string) => {
     await Clipboard.setStringAsync(text);
+    setCopiedSummary(true);
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
+    setTimeout(() => setCopiedSummary(false), 2000);
   };
 
   const hasSummary = sections.summary.length > 0;
@@ -40,37 +42,58 @@ export function DadsSummary({ sections }: DadsSummaryProps) {
           style={[
             styles.section,
             {
+              borderLeftColor: theme.accent,
               backgroundColor: theme.accentGlow,
-              borderColor: theme.accent,
             },
           ]}
         >
           <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <Feather name="bookmark" size={15} color={theme.accent} />
-              <ThemedText style={[styles.sectionTitle, { color: theme.accent }]}>
-                Dad's Summary
-              </ThemedText>
+            <View style={styles.titleRow}>
+              <Feather name="bookmark" size={12} color={theme.accent} />
+              <Text
+                style={[
+                  styles.sectionLabel,
+                  { color: theme.accent, fontFamily: Fonts.monoBold },
+                ]}
+              >
+                DAD'S SUMMARY
+              </Text>
             </View>
             <Pressable
               onPress={() =>
-                copyToClipboard(sections.summary.map((b) => `- ${b}`).join("\n"))
+                copyToClipboard(
+                  sections.summary.map((b) => `- ${b}`).join("\n")
+                )
               }
-              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+              style={({ pressed }) => ({ opacity: pressed ? 0.4 : 0.7 })}
               testID="button-copy-summary"
             >
-              <Feather name="copy" size={14} color={theme.textSecondary} />
+              <Feather
+                name={copiedSummary ? "check" : "copy"}
+                size={11}
+                color={copiedSummary ? theme.success : theme.textSecondary}
+              />
             </Pressable>
           </View>
-          <View style={styles.bulletList}>
+          <View style={styles.list}>
             {sections.summary.map((bullet, index) => (
-              <View key={index} style={styles.bulletItem}>
-                <View
-                  style={[styles.bulletDot, { backgroundColor: theme.accent }]}
-                />
-                <ThemedText style={[styles.bulletText, { color: theme.text }]}>
+              <View key={index} style={styles.listItem}>
+                <Text
+                  style={[
+                    styles.listBullet,
+                    { color: theme.accent, fontFamily: Fonts.monoBold },
+                  ]}
+                >
+                  _
+                </Text>
+                <Text
+                  style={[
+                    styles.listText,
+                    { color: theme.text, fontFamily: Fonts.mono },
+                  ]}
+                >
                   {bullet}
-                </ThemedText>
+                </Text>
               </View>
             ))}
           </View>
@@ -82,32 +105,41 @@ export function DadsSummary({ sections }: DadsSummaryProps) {
           style={[
             styles.section,
             {
-              backgroundColor: "rgba(0, 212, 170, 0.08)",
-              borderColor: theme.success,
+              borderLeftColor: theme.success,
+              backgroundColor: "rgba(0, 212, 170, 0.06)",
             },
           ]}
         >
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <Feather name="zap" size={15} color={theme.success} />
-              <ThemedText
-                style={[styles.sectionTitle, { color: theme.success }]}
-              >
-                Reflexion Questions
-              </ThemedText>
-            </View>
+          <View style={styles.titleRow}>
+            <Feather name="zap" size={12} color={theme.success} />
+            <Text
+              style={[
+                styles.sectionLabel,
+                { color: theme.success, fontFamily: Fonts.monoBold },
+              ]}
+            >
+              REFLEXION
+            </Text>
           </View>
-          <View style={styles.bulletList}>
+          <View style={styles.list}>
             {sections.reflexions.map((q, index) => (
-              <View key={index} style={styles.bulletItem}>
-                <ThemedText
-                  style={[styles.numberedLabel, { color: theme.success }]}
+              <View key={index} style={styles.listItem}>
+                <Text
+                  style={[
+                    styles.listBullet,
+                    { color: theme.success, fontFamily: Fonts.monoBold },
+                  ]}
                 >
                   {index + 1}.
-                </ThemedText>
-                <ThemedText style={[styles.bulletText, { color: theme.text }]}>
+                </Text>
+                <Text
+                  style={[
+                    styles.listText,
+                    { color: theme.text, fontFamily: Fonts.mono },
+                  ]}
+                >
                   {q}
-                </ThemedText>
+                </Text>
               </View>
             ))}
           </View>
@@ -119,24 +151,30 @@ export function DadsSummary({ sections }: DadsSummaryProps) {
           style={[
             styles.section,
             {
-              backgroundColor: "rgba(255, 184, 0, 0.08)",
-              borderColor: theme.warning,
+              borderLeftColor: theme.warning,
+              backgroundColor: "rgba(255, 184, 0, 0.06)",
             },
           ]}
         >
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <Feather name="book" size={15} color={theme.warning} />
-              <ThemedText
-                style={[styles.sectionTitle, { color: theme.warning }]}
-              >
-                Book Recommendation
-              </ThemedText>
-            </View>
+          <View style={styles.titleRow}>
+            <Feather name="book" size={12} color={theme.warning} />
+            <Text
+              style={[
+                styles.sectionLabel,
+                { color: theme.warning, fontFamily: Fonts.monoBold },
+              ]}
+            >
+              READ
+            </Text>
           </View>
-          <ThemedText style={[styles.bookText, { color: theme.text }]}>
+          <Text
+            style={[
+              styles.bookText,
+              { color: theme.text, fontFamily: Fonts.mono },
+            ]}
+          >
             {sections.book}
-          </ThemedText>
+          </Text>
         </View>
       ) : null}
     </View>
@@ -145,61 +183,52 @@ export function DadsSummary({ sections }: DadsSummaryProps) {
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginTop: Spacing.md,
+    marginTop: Spacing.lg,
     gap: Spacing.sm,
   },
   section: {
-    borderWidth: 1,
-    borderRadius: BorderRadius.sm,
-    padding: Spacing.md,
+    borderLeftWidth: 2,
+    paddingLeft: Spacing.md,
+    paddingRight: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    gap: Spacing.sm,
   },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: Spacing.sm,
   },
-  sectionTitleRow: {
+  titleRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
   },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
+  sectionLabel: {
+    fontSize: 11,
+    letterSpacing: 1.2,
   },
-  bulletList: {
-    gap: Spacing.xs,
+  list: {
+    gap: 6,
   },
-  bulletItem: {
+  listItem: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: Spacing.sm,
   },
-  bulletDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    marginTop: 9,
+  listBullet: {
+    fontSize: 12,
+    lineHeight: 20,
     flexShrink: 0,
+    minWidth: 16,
   },
-  numberedLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    lineHeight: 22,
-    minWidth: 18,
-    flexShrink: 0,
-  },
-  bulletText: {
+  listText: {
     flex: 1,
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: 13,
+    lineHeight: 20,
   },
   bookText: {
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: 13,
+    lineHeight: 20,
     fontStyle: "italic",
   },
 });

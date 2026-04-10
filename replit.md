@@ -20,13 +20,17 @@ Preferred communication style: Simple, everyday language.
   - Topic Detail screen accessible from History
 - **State Management**: React local state + AsyncStorage
 - **Local Storage**: AsyncStorage for conversation persistence, API key, memory vault
-- **Styling**: Dark navy/black theme (#0A0E18) with neon blue accent (#00AAFF)
+- **Typography**: Space Mono monospaced font throughout (SpaceMono_400Regular, SpaceMono_700Bold)
+- **Styling**: Pure black (#000000) background with neon blue accent (#00AAFF), off-white text (#E2E8F8)
 - **Key UI Components**:
-  - ChatBubble with Dad's Summary, Reflexion Questions, Book Recommendation parsing
-  - MarkdownText - custom markdown renderer (bold, italic, code, headers, lists)
-  - DadsSummary - renders all three structured response sections
+  - ChatBubble: AI messages are borderless with a 2px neon blue left border accent; user messages have a subtle blue-tinted bubble
+  - MarkdownText - custom markdown renderer with Space Mono font (bold, italic, code, headers, lists)
+  - DadsSummary - borderless left-border sections: blue for Summary, green for Reflexion, amber for Book
+  - EmptyState - minimal, shows icon + terminal-style text
+  - HeaderTitle - shows app icon + "GARY" in neon blue Space Mono
   - Copy buttons on every message
   - Image picker for photo analysis
+  - Glassmorphism input bar (BlurView on iOS, dark translucent on Android/web)
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express 5

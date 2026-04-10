@@ -17,7 +17,7 @@ import { Platform } from "react-native";
 
 import { ThemedText } from "@/components/ThemedText";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
-import { Colors, Spacing, BorderRadius } from "@/constants/theme";
+import { Colors, Spacing, BorderRadius, Fonts } from "@/constants/theme";
 import {
   getUserApiKey,
   setUserApiKey,
@@ -404,7 +404,8 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xs,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
-    fontSize: 15,
+    fontSize: 13,
+    fontFamily: Fonts.mono,
     minHeight: 48,
   },
   multilineInput: {
@@ -420,8 +421,9 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xs,
   },
   buttonText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: "700",
+    fontFamily: Fonts.monoBold,
   },
   savedKeyRow: {
     flexDirection: "row",

@@ -1,6 +1,6 @@
 import React from "react";
 import { Text, View, StyleSheet, Platform } from "react-native";
-import { Colors, Spacing, BorderRadius } from "@/constants/theme";
+import { Colors, Spacing, BorderRadius, Fonts } from "@/constants/theme";
 
 interface MarkdownTextProps {
   content: string;
@@ -16,7 +16,8 @@ type Segment =
 
 function parseInline(text: string): Segment[] {
   const segments: Segment[] = [];
-  const regex = /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+)`)/gs;
+  const regex =
+    /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+)`)/gs;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -43,18 +44,24 @@ function parseInline(text: string): Segment[] {
   return segments;
 }
 
-function renderInlineSegments(segments: Segment[], theme: typeof Colors.dark) {
+function renderInlineSegments(
+  segments: Segment[],
+  theme: typeof Colors.dark
+) {
   return segments.map((seg, i) => {
     switch (seg.type) {
       case "bold":
         return (
-          <Text key={i} style={{ fontWeight: "700", color: theme.text }}>
+          <Text key={i} style={{ fontFamily: Fonts.monoBold, color: theme.text }}>
             {seg.value}
           </Text>
         );
       case "italic":
         return (
-          <Text key={i} style={{ fontStyle: "italic", color: theme.text }}>
+          <Text
+            key={i}
+            style={{ fontFamily: Fonts.mono, fontStyle: "italic", color: theme.text }}
+          >
             {seg.value}
           </Text>
         );
@@ -62,7 +69,11 @@ function renderInlineSegments(segments: Segment[], theme: typeof Colors.dark) {
         return (
           <Text
             key={i}
-            style={{ fontWeight: "700", fontStyle: "italic", color: theme.text }}
+            style={{
+              fontFamily: Fonts.monoBold,
+              fontStyle: "italic",
+              color: theme.text,
+            }}
           >
             {seg.value}
           </Text>
@@ -72,20 +83,18 @@ function renderInlineSegments(segments: Segment[], theme: typeof Colors.dark) {
           <Text
             key={i}
             style={{
-              fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
+              fontFamily: Fonts.mono,
               backgroundColor: theme.codeBg,
               color: theme.accent,
-              fontSize: 13,
-              paddingHorizontal: 4,
-              borderRadius: 4,
+              fontSize: 12,
             }}
           >
-            {seg.value}
+            {` ${seg.value} `}
           </Text>
         );
       default:
         return (
-          <Text key={i} style={{ color: theme.text }}>
+          <Text key={i} style={{ fontFamily: Fonts.mono, color: theme.text }}>
             {seg.value}
           </Text>
         );
@@ -135,7 +144,11 @@ function parseBlocks(text: string): BlockElement[] {
       continue;
     }
 
-    if (line.trim() === "---" || line.trim() === "***" || line.trim() === "___") {
+    if (
+      line.trim() === "---" ||
+      line.trim() === "***" ||
+      line.trim() === "___"
+    ) {
       blocks.push({ type: "divider", content: "" });
       i++;
       continue;
@@ -167,7 +180,11 @@ function parseBlocks(text: string): BlockElement[] {
     const numberedMatch = line.match(/^\d+\.\s+(.+)/);
     if (numberedMatch) {
       const num = line.match(/^(\d+)\./)?.[1] || "1";
-      blocks.push({ type: "numbered", content: numberedMatch[1], level: parseInt(num) });
+      blocks.push({
+        type: "numbered",
+        content: numberedMatch[1],
+        level: parseInt(num),
+      });
       i++;
       continue;
     }
@@ -198,19 +215,13 @@ export function MarkdownText({ content, style }: MarkdownTextProps) {
         switch (block.type) {
           case "h1":
             return (
-              <Text
-                key={idx}
-                style={[styles.h1, { color: theme.text }, style]}
-              >
+              <Text key={idx} style={[styles.h1, { color: theme.text }, style]}>
                 {renderInlineSegments(parseInline(block.content), theme)}
               </Text>
             );
           case "h2":
             return (
-              <Text
-                key={idx}
-                style={[styles.h2, { color: theme.text }, style]}
-              >
+              <Text key={idx} style={[styles.h2, { color: theme.text }, style]}>
                 {renderInlineSegments(parseInline(block.content), theme)}
               </Text>
             );
@@ -226,10 +237,12 @@ export function MarkdownText({ content, style }: MarkdownTextProps) {
           case "bullet":
             return (
               <View key={idx} style={styles.bulletRow}>
-                <View
-                  style={[styles.bulletDot, { backgroundColor: theme.accent }]}
-                />
-                <Text style={[styles.paragraph, { color: theme.text, flex: 1 }, style]}>
+                <Text style={[styles.bulletMark, { color: theme.accent }]}>
+                  {">"}
+                </Text>
+                <Text
+                  style={[styles.paragraph, { color: theme.text, flex: 1 }, style]}
+                >
                   {renderInlineSegments(parseInline(block.content), theme)}
                 </Text>
               </View>
@@ -240,7 +253,9 @@ export function MarkdownText({ content, style }: MarkdownTextProps) {
                 <Text style={[styles.numberedLabel, { color: theme.accent }]}>
                   {block.level}.
                 </Text>
-                <Text style={[styles.paragraph, { color: theme.text, flex: 1 }, style]}>
+                <Text
+                  style={[styles.paragraph, { color: theme.text, flex: 1 }, style]}
+                >
                   {renderInlineSegments(parseInline(block.content), theme)}
                 </Text>
               </View>
@@ -249,19 +264,19 @@ export function MarkdownText({ content, style }: MarkdownTextProps) {
             return (
               <View
                 key={idx}
-                style={[styles.codeBlock, { backgroundColor: theme.codeBg, borderColor: theme.border }]}
+                style={[
+                  styles.codeBlock,
+                  {
+                    backgroundColor: theme.codeBg,
+                    borderColor: theme.border,
+                    borderLeftColor: theme.accent,
+                  },
+                ]}
               >
                 <Text
                   style={[
                     styles.codeText,
-                    {
-                      color: theme.accent,
-                      fontFamily: Platform.select({
-                        ios: "Menlo",
-                        android: "monospace",
-                        default: "monospace",
-                      }),
-                    },
+                    { color: theme.accent, fontFamily: Fonts.mono },
                   ]}
                 >
                   {block.content}
@@ -292,65 +307,66 @@ export function MarkdownText({ content, style }: MarkdownTextProps) {
 
 const styles = StyleSheet.create({
   h1: {
-    fontSize: 22,
-    fontWeight: "700",
-    lineHeight: 30,
+    fontSize: 18,
+    fontFamily: Fonts.monoBold,
+    lineHeight: 26,
     marginBottom: Spacing.sm,
     marginTop: Spacing.md,
   },
   h2: {
-    fontSize: 19,
-    fontWeight: "700",
-    lineHeight: 26,
+    fontSize: 16,
+    fontFamily: Fonts.monoBold,
+    lineHeight: 24,
     marginBottom: Spacing.xs,
     marginTop: Spacing.md,
   },
   h3: {
-    fontSize: 16,
-    fontWeight: "600",
-    lineHeight: 24,
+    fontSize: 14,
+    fontFamily: Fonts.monoBold,
+    lineHeight: 22,
     marginBottom: Spacing.xs,
     marginTop: Spacing.sm,
   },
   paragraph: {
-    fontSize: 15,
-    lineHeight: 23,
+    fontSize: 14,
+    fontFamily: Fonts.mono,
+    lineHeight: 22,
     marginBottom: Spacing.xs,
   },
   bulletRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: Spacing.sm,
-    marginBottom: Spacing.xs,
+    marginBottom: 6,
     paddingLeft: Spacing.xs,
   },
-  bulletDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginTop: 8,
+  bulletMark: {
+    fontSize: 12,
+    fontFamily: Fonts.monoBold,
+    lineHeight: 22,
     flexShrink: 0,
   },
   numberedLabel: {
-    fontSize: 15,
-    fontWeight: "700",
-    lineHeight: 23,
+    fontSize: 13,
+    fontFamily: Fonts.monoBold,
+    lineHeight: 22,
     minWidth: 20,
     flexShrink: 0,
   },
   codeBlock: {
     borderRadius: BorderRadius.xs,
     borderWidth: 1,
+    borderLeftWidth: 2,
     padding: Spacing.md,
     marginVertical: Spacing.sm,
   },
   codeText: {
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 19,
   },
   divider: {
     height: 1,
     marginVertical: Spacing.md,
-    opacity: 0.4,
+    opacity: 0.3,
   },
 });
