@@ -1,4 +1,18 @@
-const GEMINI_API_KEY ="AIzaSyDINRsKFc6aEGPix3O_dFvlzvqNigtPnnA";
+ const GEMINI_API_KEY = ["AIzaSyDINRsKFc6aEGPix3O_dFvlzvqNigtPnnA",
+  "AIzaSyADvLUHiNryoVzvpOhhKogtdnhmCt1w9SE",
+  "AIzaSyBJzO3AFXJqVYe2Lgfln-UBp81WDwpJ7PI",
+  "AIzaSyCKpIV9wGD0Lq3T3HFNZ-fSEuKfFiP7HGI",
+  "AIzaSyBb1IPNKY89OpDE1QAvx61FTG_RqK_Db3o",
+  "AIzaSyBvoREjEKwp52vJ_USh9UcpwWZPTKEwdOM",
+  "AIzaSyB5n21vN6EKZ9I9_Fsw3MVP5FdwdLeFb7k",
+  "AIzaSyB-d9YDobpxfcNOjKLSZgC103EpjoM_0OU",
+  "AIzaSyAM9NM9p34I5OFYs5Sqe0njuuUxHkC2FRo",
+  "AIzaSyBJNIJxp4jFQzk9lndu3JPAYx8dTndrt4Y",
+  "AIzaSyBqh-F0Je_HsVMfZvePXYRsbmEN9Ts6fe8"
+].filter(key => key !== undefined);
+
+let currentKeyIndex = 0;
+
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
 const GARY_SYSTEM_PROMPT = `You are GARY, a wise and fatherly tutor who uses the Feynman Technique to explain complex subjects. Your approach:
@@ -36,30 +50,25 @@ interface ChatMessage {
 }
 
 export async function askGary(message: string, history: ChatMessage[] = []): Promise<string> {
-  if (!GEMINI_API_KEY) {
-    throw new Error("Gemini API key is not configured. Please add EXPO_PUBLIC_API_KEY to your environment.");
+  if (GEMINI_API_KEY.length === 0) {
+    throw new Error("GARY MISSION CRITICAL: No API keys found in Replit Secrets.");
   }
 
+  const currentKey = GEMINI_API_KEY[currentKeyIndex];
+
+  currentKeyIndex = (currentKeyIndex + 1) % GEMINI_API_KEY.length;
+
   const contents = [
-    {
-      role: "user",
-      parts: [{ text: GARY_SYSTEM_PROMPT }],
-    },
-    {
-      role: "model",
-      parts: [{ text: "I understand. I am GARY, a wise and fatherly tutor. I'll use the Feynman Technique to explain concepts simply, with everyday analogies, and I'll always end my responses with Dad's Summary containing exactly 3 bullet points. How can I help you learn today?" }],
-    },
+    { role: "user", parts: [{ text: GARY_SYSTEM_PROMPT }] },
+    { role: "model", parts: [{ text: "I understand. I am GARY, a wise and fatherly tutor. I'll use the Feynman Technique to explain concepts simply and always end with a Dad's Summary." }] },
     ...history.map((msg) => ({
       role: msg.role === "assistant" ? "model" : "user",
       parts: [{ text: msg.content }],
     })),
-    {
-      role: "user",
-      parts: [{ text: message }],
-    },
+    { role: "user", parts: [{ text: message }] },
   ];
-
-  const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+  
+  const response = await fetch(`${GEMINI_API_URL}?key=${currentKey}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -74,10 +83,15 @@ export async function askGary(message: string, history: ChatMessage[] = []): Pro
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
-    console.error("Gemini API error:", errorData);
-    return `GARY DIAGNOSTIC: ${response.status} - ${errorData.error?.message || "Unknown error"}`;
+    const errorData = await 
+      response.json();
+    console.log("GARY Diagnostic:", errorData); 
+    return `GARY SYSTEM NOTICE: ${response.status}. Please try again in a moment.`;
   }
+
+  if (response.status === 429) {
+      return "I'm thinking quite hard right now for the club! Give me just 20 seconds to gather my thoughts and ask me again.";
+    }
 
   const data = await response.json();
   
