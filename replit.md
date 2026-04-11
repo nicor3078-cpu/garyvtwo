@@ -54,18 +54,18 @@ Centralized storage utilities for API key and memory vault CRUD.
 - **Cancellation**: AbortController support for cancelling in-flight requests
 - **Image analysis**: Supports base64 image attachments (Gemini Vision)
 
-### V2 Features
-1. **Neon Blue Theme**: Dark (#0A0E18) background with #00AAFF accent
-2. **BYOAK Settings**: Users paste their own Gemini API key with validation
-3. **Memory Vault**: Save name, grade, birthday, interests for personalized responses
-4. **No question limit**: Unlimited questions (removed 10/day cap)
-5. **Markdown rendering**: Custom renderer for bold, italic, code blocks, headers, lists
-6. **Copy buttons**: On every message and on the Dad's Summary
-7. **Auto-retry**: 3 retries with backoff on API errors
-8. **Reflexion Questions**: 3 numbered follow-up questions after each explanation
-9. **Book Recommendations**: One book suggestion after each explanation
-10. **Temporal awareness**: GARY knows today's date and time
-11. **Image analysis**: Pick a photo from gallery for GARY to analyze
+### V2 Features — Sovereign Gary
+1. **Pure black terminal aesthetic**: #000000 bg, #00AAFF neon blue, Space Mono font throughout
+2. **Sovereign Key**: User's own Gemini API key (required — no built-in pool). Stored in AsyncStorage. If missing, Gary shows guidance to get a key from aistudio.google.com.
+3. **Remote config (Gist Brain)**: `fetchConfig()` fetches `current_model` from a GitHub Gist URL before every request (5-min cache). Defaults to `gemini-1.5-flash` on failure.
+4. **Full vision/multimodal**: Image analysis supported. System prompt explicitly enables vision. Base64 validation + fallback to text-only on 400 errors.
+5. **Exponential backoff**: 429 errors retry at 2s, 4s, 8s intervals. Animated `:>` pulse + "Recalibrating sensors..." shown during retries.
+6. **Ministry Metrics (Supabase)**: After every successful response, client calls `POST /api/log-metrics` with logic_score (IQ heuristic), topic, and student_name. Backend uses `SUPABASE_URL`+`SUPABASE_KEY` env vars to log to `student_metrics` table.
+7. **Memory Vault**: Save name, grade, birthday, interests for personalized responses
+8. **Structured responses**: Dad's Summary + Reflexion Questions + Book Recommendation every time
+9. **Markdown rendering**: Custom renderer with Space Mono, bullet/numbered lists, code blocks, headers
+10. **Copy buttons**: On every message and on the Dad's Summary
+11. **Image analysis**: Pick a photo from gallery for GARY to analyze (vision model)
 12. **New conversation button**: Top-right "New" button to clear chat
 
 ### Path Aliases

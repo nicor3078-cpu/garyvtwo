@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
+  Text,
   StyleSheet,
   Pressable,
   TextInput,
   ActivityIndicator,
-  ScrollView,
-  Alert,
   Linking,
   Platform,
 } from "react-native";
@@ -16,7 +15,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
-import { ThemedText } from "@/components/ThemedText";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Colors, Spacing, BorderRadius, Fonts } from "@/constants/theme";
 import {
@@ -29,6 +27,8 @@ import {
 } from "@/lib/storage";
 import { validateApiKey } from "@/lib/gemini";
 
+const AI_STUDIO_URL = "https://aistudio.google.com/app/apikey";
+
 export default function SettingsScreen() {
   const theme = Colors.dark;
   const headerHeight = useHeaderHeight();
@@ -37,9 +37,7 @@ export default function SettingsScreen() {
   const [apiKey, setApiKey] = useState("");
   const [savedApiKey, setSavedApiKey] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(false);
-  const [keyStatus, setKeyStatus] = useState<"idle" | "valid" | "invalid">(
-    "idle"
-  );
+  const [keyStatus, setKeyStatus] = useState<"idle" | "valid" | "invalid">("idle");
 
   const [memory, setMemory] = useState<MemoryVault>({
     name: "",
@@ -103,6 +101,10 @@ export default function SettingsScreen() {
     setTimeout(() => setMemorySaved(false), 2500);
   };
 
+  const openAiStudio = () => {
+    Linking.openURL(AI_STUDIO_URL);
+  };
+
   const maskedKey = savedApiKey
     ? `${savedApiKey.slice(0, 8)}${"*".repeat(20)}${savedApiKey.slice(-4)}`
     : null;
@@ -118,41 +120,55 @@ export default function SettingsScreen() {
         },
       ]}
     >
+      {/* ── SOVEREIGN KEY ────────────────────────── */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Feather name="key" size={16} color={theme.accent} />
-          <ThemedText style={[styles.sectionTitle, { color: theme.accent }]}>
-            API Key (BYOAK)
-          </ThemedText>
+          <Feather name="key" size={15} color={theme.accent} />
+          <Text style={[styles.sectionTitle, { color: theme.accent, fontFamily: Fonts.monoBold }]}>
+            Sovereign Key
+          </Text>
         </View>
-        <ThemedText
-          style={[styles.sectionDesc, { color: theme.textSecondary }]}
-        >
-          Use your own Gemini API key for unlimited access. Get one free at
-          aistudio.google.com. Without a custom key, GARY uses the built-in
-          shared pool.
-        </ThemedText>
 
+        <Text style={[styles.sectionDesc, { color: theme.textSecondary, fontFamily: Fonts.mono }]}>
+          Your personal Gemini API key gives you unlimited, private access to GARY. Without one, Gary is silent.
+        </Text>
+
+        {/* AI Studio link */}
+        <Pressable
+          onPress={openAiStudio}
+          style={({ pressed }) => [styles.linkRow, { opacity: pressed ? 0.6 : 1 }]}
+          testID="button-ai-studio-link"
+        >
+          <Feather name="external-link" size={13} color={theme.accent} />
+          <Text style={[styles.linkText, { color: theme.accent, fontFamily: Fonts.mono }]}>
+            Get your free key from Google AI Studio
+          </Text>
+        </Pressable>
+
+        {/* Saved key badge */}
         {savedApiKey ? (
           <View
             style={[
               styles.savedKeyRow,
-              { backgroundColor: theme.backgroundSecondary, borderColor: theme.success },
+              {
+                backgroundColor: "rgba(0, 212, 170, 0.06)",
+                borderColor: theme.success,
+              },
             ]}
           >
-            <Feather name="check-circle" size={14} color={theme.success} />
-            <ThemedText
-              style={[styles.maskedKey, { color: theme.text }]}
+            <Feather name="check-circle" size={13} color={theme.success} />
+            <Text
+              style={[styles.maskedKey, { color: theme.text, fontFamily: Fonts.mono }]}
               numberOfLines={1}
             >
               {maskedKey}
-            </ThemedText>
+            </Text>
             <Pressable
               onPress={handleClearApiKey}
               style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
               testID="button-clear-api-key"
             >
-              <Feather name="trash-2" size={14} color={theme.error} />
+              <Feather name="trash-2" size={13} color={theme.error} />
             </Pressable>
           </View>
         ) : null}
@@ -169,9 +185,10 @@ export default function SettingsScreen() {
                   : keyStatus === "invalid"
                   ? theme.error
                   : theme.border,
+              fontFamily: Fonts.mono,
             },
           ]}
-          placeholder="Paste your Gemini API key here..."
+          placeholder="Paste your Gemini API key..."
           placeholderTextColor={theme.textSecondary}
           value={apiKey}
           onChangeText={(t) => {
@@ -180,18 +197,17 @@ export default function SettingsScreen() {
           }}
           autoCapitalize="none"
           autoCorrect={false}
-          secureTextEntry={false}
           testID="input-api-key"
         />
 
         {keyStatus === "valid" ? (
-          <ThemedText style={[styles.statusText, { color: theme.success }]}>
-            API key saved and verified!
-          </ThemedText>
+          <Text style={[styles.statusText, { color: theme.success, fontFamily: Fonts.mono }]}>
+            key verified and saved
+          </Text>
         ) : keyStatus === "invalid" ? (
-          <ThemedText style={[styles.statusText, { color: theme.error }]}>
-            Invalid key. Check it and try again.
-          </ThemedText>
+          <Text style={[styles.statusText, { color: theme.error, fontFamily: Fonts.mono }]}>
+            invalid key — double-check and retry
+          </Text>
         ) : null}
 
         <Pressable
@@ -201,7 +217,9 @@ export default function SettingsScreen() {
             styles.button,
             {
               backgroundColor:
-                apiKey.trim() && !isValidating ? theme.accent : theme.backgroundTertiary,
+                apiKey.trim() && !isValidating
+                  ? theme.accent
+                  : theme.backgroundTertiary,
               opacity: pressed ? 0.8 : 1,
             },
           ]}
@@ -212,15 +230,15 @@ export default function SettingsScreen() {
           ) : (
             <>
               <Feather
-                name="save"
-                size={16}
+                name="check"
+                size={15}
                 color={
                   apiKey.trim() && !isValidating
                     ? theme.buttonText
                     : theme.textSecondary
                 }
               />
-              <ThemedText
+              <Text
                 style={[
                   styles.buttonText,
                   {
@@ -228,11 +246,12 @@ export default function SettingsScreen() {
                       apiKey.trim() && !isValidating
                         ? theme.buttonText
                         : theme.textSecondary,
+                    fontFamily: Fonts.monoBold,
                   },
                 ]}
               >
-                Validate & Save Key
-              </ThemedText>
+                validate + save key
+              </Text>
             </>
           )}
         </Pressable>
@@ -240,27 +259,30 @@ export default function SettingsScreen() {
 
       <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
+      {/* ── MEMORY VAULT ─────────────────────────── */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Feather name="user" size={16} color={theme.accent} />
-          <ThemedText style={[styles.sectionTitle, { color: theme.accent }]}>
+          <Feather name="user" size={15} color={theme.accent} />
+          <Text style={[styles.sectionTitle, { color: theme.accent, fontFamily: Fonts.monoBold }]}>
             Memory Vault
-          </ThemedText>
+          </Text>
         </View>
-        <ThemedText
-          style={[styles.sectionDesc, { color: theme.textSecondary }]}
-        >
-          Tell GARY about yourself so he can personalize his explanations and
-          examples just for you.
-        </ThemedText>
+        <Text style={[styles.sectionDesc, { color: theme.textSecondary, fontFamily: Fonts.mono }]}>
+          Tell Gary who you are. He'll personalize every explanation to match your level, interests, and life.
+        </Text>
 
-        <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
-          Your Name
-        </ThemedText>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.mono }]}>
+          your name
+        </Text>
         <TextInput
           style={[
             styles.input,
-            { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border },
+            {
+              backgroundColor: theme.backgroundSecondary,
+              color: theme.text,
+              borderColor: theme.border,
+              fontFamily: Fonts.mono,
+            },
           ]}
           placeholder="e.g. Alex"
           placeholderTextColor={theme.textSecondary}
@@ -269,13 +291,18 @@ export default function SettingsScreen() {
           testID="input-name"
         />
 
-        <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
-          Grade / Level
-        </ThemedText>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.mono }]}>
+          grade / level
+        </Text>
         <TextInput
           style={[
             styles.input,
-            { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border },
+            {
+              backgroundColor: theme.backgroundSecondary,
+              color: theme.text,
+              borderColor: theme.border,
+              fontFamily: Fonts.mono,
+            },
           ]}
           placeholder="e.g. Grade 10, University Year 2, Self-taught"
           placeholderTextColor={theme.textSecondary}
@@ -284,13 +311,18 @@ export default function SettingsScreen() {
           testID="input-grade"
         />
 
-        <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
-          Birthday (optional)
-        </ThemedText>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.mono }]}>
+          birthday (optional)
+        </Text>
         <TextInput
           style={[
             styles.input,
-            { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border },
+            {
+              backgroundColor: theme.backgroundSecondary,
+              color: theme.text,
+              borderColor: theme.border,
+              fontFamily: Fonts.mono,
+            },
           ]}
           placeholder="e.g. March 15"
           placeholderTextColor={theme.textSecondary}
@@ -299,16 +331,21 @@ export default function SettingsScreen() {
           testID="input-birthday"
         />
 
-        <ThemedText style={[styles.label, { color: theme.textSecondary }]}>
-          Interests & Hobbies
-        </ThemedText>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.mono }]}>
+          interests & hobbies
+        </Text>
         <TextInput
           style={[
             styles.input,
             styles.multilineInput,
-            { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border },
+            {
+              backgroundColor: theme.backgroundSecondary,
+              color: theme.text,
+              borderColor: theme.border,
+              fontFamily: Fonts.mono,
+            },
           ]}
-          placeholder="e.g. basketball, gaming, music production, cooking..."
+          placeholder="e.g. basketball, gaming, music production..."
           placeholderTextColor={theme.textSecondary}
           value={memory.interests}
           onChangeText={(t) => setMemory((m) => ({ ...m, interests: t }))}
@@ -335,12 +372,17 @@ export default function SettingsScreen() {
             <>
               <Feather
                 name={memorySaved ? "check" : "save"}
-                size={16}
+                size={15}
                 color={theme.buttonText}
               />
-              <ThemedText style={[styles.buttonText, { color: theme.buttonText }]}>
-                {memorySaved ? "Saved!" : "Save to Memory Vault"}
-              </ThemedText>
+              <Text
+                style={[
+                  styles.buttonText,
+                  { color: theme.buttonText, fontFamily: Fonts.monoBold },
+                ]}
+              >
+                {memorySaved ? "saved to vault" : "save to memory vault"}
+              </Text>
             </>
           )}
         </Pressable>
@@ -348,21 +390,25 @@ export default function SettingsScreen() {
 
       <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
+      {/* ── ABOUT ────────────────────────────────── */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Feather name="info" size={16} color={theme.textSecondary} />
-          <ThemedText style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-            About GARY V2
-          </ThemedText>
+          <Feather name="terminal" size={15} color={theme.textSecondary} />
+          <Text
+            style={[
+              styles.sectionTitle,
+              { color: theme.textSecondary, fontFamily: Fonts.monoBold },
+            ]}
+          >
+            About Gary
+          </Text>
         </View>
-        <ThemedText style={[styles.aboutText, { color: theme.textSecondary }]}>
-          GARY uses the Feynman Technique to make complex subjects simple.
-          Every answer includes a Dad's Summary, Reflexion Questions to test
-          your understanding, and a Book Recommendation to go deeper.
-        </ThemedText>
-        <ThemedText style={[styles.aboutText, { color: theme.textSecondary }]}>
-          Powered by Google Gemini 2.5 Flash.
-        </ThemedText>
+        <Text style={[styles.aboutText, { color: theme.textSecondary, fontFamily: Fonts.mono }]}>
+          GARY is an elite polymath mentor powered by the Feynman Technique. Every answer ends with a Dad's Summary, Reflexion Questions, and a Book Recommendation.
+        </Text>
+        <Text style={[styles.aboutText, { color: theme.textSecondary, fontFamily: Fonts.mono }]}>
+          Powered by Google Gemini (model: dynamic via remote config).
+        </Text>
       </View>
     </KeyboardAwareScrollViewCompat>
   );
@@ -384,19 +430,26 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    letterSpacing: 0.8,
+    fontSize: 13,
+    letterSpacing: 1,
     textTransform: "uppercase",
   },
   sectionDesc: {
     fontSize: 13,
-    lineHeight: 20,
+    lineHeight: 21,
+  },
+  linkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+  },
+  linkText: {
+    fontSize: 13,
+    textDecorationLine: "underline",
   },
   label: {
-    fontSize: 12,
-    fontWeight: "600",
-    letterSpacing: 0.5,
+    fontSize: 11,
+    letterSpacing: 0.8,
     textTransform: "uppercase",
     marginBottom: -Spacing.xs,
   },
@@ -406,8 +459,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     fontSize: 13,
-    fontFamily: Fonts.mono,
-    minHeight: 48,
+    minHeight: 46,
   },
   multilineInput: {
     minHeight: 80,
@@ -418,13 +470,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: Spacing.sm,
-    height: 48,
+    height: 46,
     borderRadius: BorderRadius.xs,
   },
   buttonText: {
     fontSize: 13,
-    fontWeight: "700",
-    fontFamily: Fonts.monoBold,
   },
   savedKeyRow: {
     flexDirection: "row",
@@ -436,25 +486,20 @@ const styles = StyleSheet.create({
   },
   maskedKey: {
     flex: 1,
-    fontSize: 13,
-    fontFamily: Platform.select({
-      ios: "Menlo",
-      android: "monospace",
-      default: "monospace",
-    }),
+    fontSize: 12,
   },
   statusText: {
-    fontSize: 13,
-    fontWeight: "600",
+    fontSize: 12,
     marginTop: -Spacing.xs,
   },
   divider: {
     height: 1,
     marginVertical: Spacing.xl,
-    opacity: 0.4,
+    opacity: 0.3,
   },
   aboutText: {
     fontSize: 13,
-    lineHeight: 20,
+    lineHeight: 21,
   },
+  backgroundTertiary: {},
 });

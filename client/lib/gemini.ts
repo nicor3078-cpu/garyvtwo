@@ -1,23 +1,36 @@
 import { getUserApiKey, getMemoryVault } from "@/lib/storage";
 
-const BUILT_IN_KEYS = [
-  "AIzaSyDINRsKFc6aEGPix3O_dFvlzvqNigtPnnA",
-  "AIzaSyADvLUHiNryoVzvpOhhKogtdnhmCt1w9SE",
-  "AIzaSyBJzO3AFXJqVYe2Lgfln-UBp81WDwpJ7PI",
-  "AIzaSyCKpIV9wGD0Lq3T3HFNZ-fSEuKfFiP7HGI",
-  "AIzaSyBb1IPNKY89OpDE1QAvx61FTG_RqK_Db3o",
-  "AIzaSyBvoREjEKwp52vJ_USh9UcpwWZPTKEwdOM",
-  "AIzaSyB5n21vN6EKZ9I9_Fsw3MVP5FdwdLeFb7k",
-  "AIzaSyB-d9YDobpxfcNOjKLSZgC103EpjoM_0OU",
-  "AIzaSyAM9NM9p34I5OFYs5Sqe0njuuUxHkC2FRo",
-  "AIzaSyBJNIJxp4jFQzk9lndu3JPAYx8dTndrt4Y",
-  "AIzaSyBqh-F0Je_HsVMfZvePXYRsbmEN9Ts6fe8",
-];
+const CONFIG_URL =
+  "https://gist.githubusercontent.com/nicor3078-cpu/308f7d8ab992826693a264d9f9cf7fa2/raw/502019b4e650d57793628aedc2e703c0e6ea7ea6/gary_config.json";
+const DEFAULT_MODEL = "gemini-1.5-flash";
 
-let currentKeyIndex = 0;
+let cachedModel: string | null = null;
+let configFetchedAt = 0;
+const CONFIG_TTL = 5 * 60 * 1000;
 
-const GEMINI_API_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+async function fetchConfig(): Promise<string> {
+  const now = Date.now();
+  if (cachedModel && now - configFetchedAt < CONFIG_TTL) {
+    return cachedModel;
+  }
+  try {
+    const res = await fetch(CONFIG_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("Config fetch failed");
+    const json = await res.json();
+    const model = typeof json.current_model === "string" && json.current_model
+      ? json.current_model
+      : DEFAULT_MODEL;
+    cachedModel = model;
+    configFetchedAt = now;
+    return model;
+  } catch {
+    return cachedModel || DEFAULT_MODEL;
+  }
+}
+
+function getApiUrl(model: string): string {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+}
 
 function buildSystemPrompt(memory: {
   name: string;
@@ -38,12 +51,7 @@ function buildSystemPrompt(memory: {
   });
 
   let memorySection = "";
-  if (
-    memory.name ||
-    memory.birthday ||
-    memory.interests ||
-    memory.grade
-  ) {
+  if (memory.name || memory.birthday || memory.interests || memory.grade) {
     memorySection = `\n\nSTUDENT PROFILE (remember this throughout our conversation):`;
     if (memory.name) memorySection += `\n- Name: ${memory.name}`;
     if (memory.grade) memorySection += `\n- Grade/Level: ${memory.grade}`;
@@ -53,32 +61,31 @@ function buildSystemPrompt(memory: {
     memorySection += `\n\nPersonalize your explanations and analogies to relate to this student's interests and level.`;
   }
 
-  return `You are GARY, a wise and fatherly tutor who uses the Feynman Technique to explain complex subjects. Today is ${dateStr} at ${timeStr}.${memorySection}
+  return `You are GARY, an elite polymath mentor and wise tutor. You use the Feynman Technique to make any concept crystal clear. Today is ${dateStr} at ${timeStr}.${memorySection}
 
 PERSONALITY:
-- You speak with warmth and patience, like a caring father helping his child understand the world
-- You use "straight-talk" - no jargon, no unnecessary complexity
-- You relate concepts to everyday experiences and simple analogies
-- You're encouraging but honest, celebrating curiosity while gently correcting misconceptions
-- Use the student's name and interests when you know them to make examples feel personal
+- Brilliant, philosophical, and deeply encouraging — like a mentor who believes the student is capable of anything
+- Straight-talk only: no jargon, no unnecessary complexity, maximum clarity
+- Relatable analogies from everyday life, science, history, and culture
+- Honest and precise, always celebrating curiosity
 
 VISUAL ANALYSIS:
-- You can see and analyze images with high precision. When an image is shared, describe what you observe in detail, then explain the relevant concepts it illustrates.
-- For diagrams, charts, equations, or photos: identify all key elements, then teach the underlying concept using the Feynman Technique.
+- You can see and analyze images with high precision. When an image is shared, describe what you observe in detail, then explain the relevant concepts using the Feynman Technique.
+- For diagrams, charts, equations, or photos: identify all key elements, then teach the underlying concept.
 - For text or documents in images: read and explain them clearly.
-- Never say you cannot see an image. You have full vision capabilities.
+- You have full vision capabilities. Never say you cannot see an image.
 
 TEACHING METHOD (Feynman Technique):
-1. Explain concepts as if teaching a child - use simple words first, then build up
-2. Use relatable analogies from everyday life
-3. Identify gaps in understanding and address them directly
-4. Connect new ideas to things the student already knows
+1. Explain concepts as if teaching a curious 12-year-old — build from first principles
+2. Use vivid, relatable analogies from everyday life
+3. Identify gaps and address them directly
+4. Connect new ideas to what the student already knows
 
-RESPONSE FORMAT - You MUST follow this EXACT structure every time:
+RESPONSE FORMAT — Follow this EXACT structure every time:
 
-First, give your full explanation using markdown formatting (bold key terms, use bullet lists for steps, use code blocks for code/formulas).
+First, give your full explanation using markdown formatting (bold key terms, bullet lists for steps, code blocks for code/formulas).
 
-Then end with ALL THREE of the following sections in this exact order:
+Then end with ALL THREE sections in this exact order:
 
 **Dad's Summary:**
 - [First key takeaway in one simple sentence]
@@ -94,9 +101,9 @@ Then end with ALL THREE of the following sections in this exact order:
 [ONE book title in quotes followed by a dash and one sentence on why it's perfect for this topic]
 
 CRITICAL RULES:
-- The Dad's Summary must have EXACTLY 3 bullet points starting with hyphens (-)
-- The Reflexion Questions must have EXACTLY 3 numbered questions
-- The Book Recommendation must be ONE line only
+- Dad's Summary: EXACTLY 3 bullet points starting with hyphens (-)
+- Reflexion Questions: EXACTLY 3 numbered questions
+- Book Recommendation: ONE line only
 - Never skip any of these three sections`;
 }
 
@@ -112,25 +119,19 @@ export interface ImageAttachment {
 
 async function getApiKey(): Promise<string> {
   const userKey = await getUserApiKey();
-  if (userKey) return userKey;
-
-  if (BUILT_IN_KEYS.length === 0) {
-    throw new Error(
-      "No API keys available. Please add your Gemini API key in Settings."
-    );
-  }
-
-  const key = BUILT_IN_KEYS[currentKeyIndex];
-  currentKeyIndex = (currentKeyIndex + 1) % BUILT_IN_KEYS.length;
-  return key;
+  if (userKey && userKey.trim()) return userKey.trim();
+  throw new Error(
+    "NO_API_KEY"
+  );
 }
 
 async function makeGeminiRequest(
   apiKey: string,
+  model: string,
   contents: object[],
   signal?: AbortSignal
 ): Promise<Response> {
-  return fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+  return fetch(`${getApiUrl(model)}?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -144,75 +145,103 @@ async function makeGeminiRequest(
   });
 }
 
+function isValidBase64(b64: string): boolean {
+  if (!b64 || b64.trim().length === 0) return false;
+  if (b64.length < 100) return false;
+  return true;
+}
+
 export async function askGary(
   message: string,
   history: ChatMessage[] = [],
   image?: ImageAttachment,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onRetry?: (attempt: number, reason: string) => void
 ): Promise<string> {
   const memory = await getMemoryVault();
   const systemPrompt = buildSystemPrompt(memory);
   const apiKey = await getApiKey();
+  const model = await fetchConfig();
 
-  const userParts: object[] = [{ text: message }];
-  if (image) {
-    userParts.push({
-      inlineData: {
-        mimeType: image.mimeType,
-        data: image.base64,
-      },
-    });
-  }
+  const imageIsValid = image && isValidBase64(image.base64);
 
-  const contents = [
-    { role: "user", parts: [{ text: systemPrompt }] },
-    {
-      role: "model",
-      parts: [
-        {
-          text: "Understood. I am GARY, your wise and fatherly tutor. I'll use the Feynman Technique, personalize my examples, and always end with Dad's Summary, Reflexion Questions, and a Book Recommendation.",
+  const buildContents = (includeImage: boolean) => {
+    const userParts: object[] = [{ text: message }];
+
+    if (includeImage && imageIsValid) {
+      userParts.push({
+        inlineData: {
+          mimeType: image!.mimeType || "image/jpeg",
+          data: image!.base64,
         },
-      ],
-    },
-    ...history.slice(-12).map((msg) => ({
-      role: msg.role === "assistant" ? "model" : "user",
-      parts: [{ text: msg.content }],
-    })),
-    { role: "user", parts: userParts },
-  ];
+      });
+    }
 
-  const MAX_RETRIES = 3;
+    return [
+      { role: "user", parts: [{ text: systemPrompt }] },
+      {
+        role: "model",
+        parts: [
+          {
+            text: "Understood. I am GARY, your elite polymath mentor. I'll use the Feynman Technique, analyze any visuals with precision, personalize my examples, and always end with Dad's Summary, Reflexion Questions, and a Book Recommendation.",
+          },
+        ],
+      },
+      ...history.slice(-12).map((msg) => ({
+        role: msg.role === "assistant" ? "model" : "user",
+        parts: [{ text: msg.content }],
+      })),
+      { role: "user", parts: userParts },
+    ];
+  };
+
+  const RETRY_DELAYS = [2000, 4000, 8000];
+  const MAX_ATTEMPTS = 4;
   let lastError: Error | null = null;
+  let useImage = !!imageIsValid;
 
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
-      if (signal?.aborted) {
-        throw new Error("Request cancelled");
-      }
+      if (signal?.aborted) throw new Error("Request cancelled");
 
-      const response = await makeGeminiRequest(apiKey, contents, signal);
+      const contents = buildContents(useImage);
+      const response = await makeGeminiRequest(apiKey, model, contents, signal);
 
       if (response.status === 429) {
-        if (attempt < MAX_RETRIES - 1) {
-          await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+        if (attempt < RETRY_DELAYS.length) {
+          const delay = RETRY_DELAYS[attempt];
+          onRetry?.(attempt + 1, "rate_limit");
+          await new Promise((r) => setTimeout(r, delay));
           continue;
         }
-        return "I'm getting a lot of questions right now. Give me just 20 seconds and ask me again, okay?";
+        return "I'm fielding a lot of questions at the moment. Give me 20 seconds and try again — I'm not going anywhere.";
       }
 
       if (response.status === 503 || response.status === 502) {
-        if (attempt < MAX_RETRIES - 1) {
-          await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+        if (attempt < RETRY_DELAYS.length) {
+          const delay = RETRY_DELAYS[attempt];
+          onRetry?.(attempt + 1, "server_error");
+          await new Promise((r) => setTimeout(r, delay));
           continue;
         }
-        return "The connection is struggling a bit. Try again in a moment - I'm not going anywhere.";
+        return "The connection is struggling. Try again in a moment — I'm still here.";
+      }
+
+      if (response.status === 400) {
+        const errorData = await response.json().catch(() => ({}));
+        if (useImage && attempt === 0) {
+          useImage = false;
+          onRetry?.(attempt + 1, "image_fallback");
+          await new Promise((r) => setTimeout(r, 500));
+          continue;
+        }
+        console.warn("GARY 400 error:", errorData);
+        return "Something went wrong processing that request. Try rephrasing and I'll be right with you.";
       }
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.log("GARY Diagnostic:", errorData);
-        if (attempt < MAX_RETRIES - 1) {
-          await new Promise((r) => setTimeout(r, 1000));
+        if (attempt < RETRY_DELAYS.length) {
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
           continue;
         }
         return `Something went wrong on my end (${response.status}). Please try again in a moment.`;
@@ -226,11 +255,16 @@ export async function askGary(
 
       throw new Error("Unexpected API response structure");
     } catch (error: any) {
-      if (error.name === "AbortError" || error.message === "Request cancelled") {
+      if (
+        error.name === "AbortError" ||
+        error.message === "Request cancelled"
+      ) {
         throw error;
       }
+      if (error.message === "NO_API_KEY") throw error;
       lastError = error;
-      if (attempt < MAX_RETRIES - 1) {
+      if (attempt < RETRY_DELAYS.length) {
+        onRetry?.(attempt + 1, "network_error");
         await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
       }
     }
@@ -241,13 +275,12 @@ export async function askGary(
 
 export async function validateApiKey(key: string): Promise<boolean> {
   try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${key}`, {
+    const model = await fetchConfig();
+    const response = await fetch(`${getApiUrl(model)}?key=${key}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [
-          { role: "user", parts: [{ text: "Hello" }] },
-        ],
+        contents: [{ role: "user", parts: [{ text: "Hello" }] }],
         generationConfig: { maxOutputTokens: 10 },
       }),
     });

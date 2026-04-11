@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,8 @@ import {
   Pressable,
   StyleSheet,
   Platform,
-  ActivityIndicator,
+  Animated,
+  Easing,
 } from "react-native";
 import { BlurView } from "expo-blur";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
@@ -24,7 +25,13 @@ import { ChatBubble, Message } from "@/components/ChatBubble";
 import { EmptyState } from "@/components/EmptyState";
 import { Colors, Spacing, BorderRadius, Fonts } from "@/constants/theme";
 import { askGary, ImageAttachment } from "@/lib/gemini";
+import { getMemoryVault } from "@/lib/storage";
 import { KEYS } from "@/lib/storage";
+import {
+  logMinistryData,
+  calculateIQ,
+  extractTopic,
+} from "@/lib/supabase";
 
 interface Conversation {
   id: string;
@@ -37,6 +44,146 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function RecalibratingIndicator({ visible }: { visible: boolean }) {
+  const theme = Colors.dark;
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    if (!visible) {
+      pulseAnim.setValue(0.3);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 600,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 600,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [visible]);
+
+  if (!visible) return null;
+
+  return (
+    <View style={styles.recalibrating}>
+      <Animated.View
+        style={[
+          styles.recalibIcon,
+          {
+            backgroundColor: theme.accent,
+            opacity: pulseAnim,
+          },
+        ]}
+      >
+        <Text style={[styles.recalibIconText, { fontFamily: Fonts.monoBold }]}>
+          :&gt;
+        </Text>
+      </Animated.View>
+      <Text
+        style={[
+          styles.recalibText,
+          { color: theme.accent, fontFamily: Fonts.mono },
+        ]}
+      >
+        Recalibrating sensors... high traffic detected.
+      </Text>
+    </View>
+  );
+}
+
+function LoadingDots({ isImage }: { isImage: boolean }) {
+  const theme = Colors.dark;
+  const dotAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(dotAnim, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(dotAnim, {
+          toValue: 0,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
+  const opacity1 = dotAnim.interpolate({
+    inputRange: [0, 0.3, 1],
+    outputRange: [0.2, 1, 0.2],
+  });
+  const opacity2 = dotAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0.2, 1, 0.2],
+  });
+  const opacity3 = dotAnim.interpolate({
+    inputRange: [0, 0.7, 1],
+    outputRange: [0.2, 1, 0.2],
+  });
+
+  return (
+    <View style={styles.loadingContainer}>
+      <View style={styles.loadingLeft}>
+        <View
+          style={[styles.loadingDots, { borderLeftColor: theme.accent }]}
+        >
+          <Animated.Text
+            style={[
+              styles.dot,
+              { color: theme.accent, opacity: opacity1 },
+            ]}
+          >
+            .
+          </Animated.Text>
+          <Animated.Text
+            style={[
+              styles.dot,
+              { color: theme.accent, opacity: opacity2 },
+            ]}
+          >
+            .
+          </Animated.Text>
+          <Animated.Text
+            style={[
+              styles.dot,
+              { color: theme.accent, opacity: opacity3 },
+            ]}
+          >
+            .
+          </Animated.Text>
+        </View>
+        {isImage ? (
+          <Text
+            style={[
+              styles.loadingLabel,
+              { color: theme.textSecondary, fontFamily: Fonts.mono },
+            ]}
+          >
+            analyzing image
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -46,18 +193,22 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [hasImageRequest, setHasImageRequest] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [pendingImage, setPendingImage] = useState<{
     uri: string;
     base64: string;
     mimeType: string;
   } | null>(null);
+  const [noKeyError, setNoKeyError] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   useFocusEffect(
     useCallback(() => {
       loadCurrentConversation();
+      setNoKeyError(false);
     }, [])
   );
 
@@ -144,6 +295,9 @@ export default function ChatScreen() {
     setPendingImage(null);
     setInputText("");
     setIsLoading(false);
+    setIsRetrying(false);
+    setHasImageRequest(false);
+    setNoKeyError(false);
     await AsyncStorage.removeItem(KEYS.CURRENT_CONVERSATION);
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -171,11 +325,14 @@ export default function ChatScreen() {
   const sendMessage = async () => {
     if ((!inputText.trim() && !pendingImage) || isLoading) return;
 
+    setNoKeyError(false);
     abortRef.current = new AbortController();
 
     const imageAttachment: ImageAttachment | undefined = pendingImage
       ? { base64: pendingImage.base64, mimeType: pendingImage.mimeType }
       : undefined;
+
+    const hasImg = !!pendingImage;
 
     const userMessage: Message = {
       id: generateId(),
@@ -190,6 +347,8 @@ export default function ChatScreen() {
     setInputText("");
     setPendingImage(null);
     setIsLoading(true);
+    setHasImageRequest(hasImg);
+    setIsRetrying(false);
 
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -203,7 +362,12 @@ export default function ChatScreen() {
           content: m.content,
         })),
         imageAttachment,
-        abortRef.current.signal
+        abortRef.current.signal,
+        (attempt, reason) => {
+          if (reason === "rate_limit") {
+            setIsRetrying(true);
+          }
+        }
       );
 
       const assistantMessage: Message = {
@@ -217,6 +381,12 @@ export default function ChatScreen() {
       setMessages(updatedMessages);
       await saveConversation(updatedMessages);
 
+      // Ministry logging
+      const iqScore = calculateIQ(responseText);
+      const topic = extractTopic(userMessage.content);
+      const vault = await getMemoryVault();
+      logMinistryData(iqScore, topic, vault.name || "Anonymous");
+
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -226,6 +396,23 @@ export default function ChatScreen() {
         error?.message === "Request cancelled"
       ) {
         setIsLoading(false);
+        setIsRetrying(false);
+        return;
+      }
+
+      if (error?.message === "NO_API_KEY") {
+        setNoKeyError(true);
+        const keyMsg: Message = {
+          id: generateId(),
+          role: "assistant",
+          content:
+            "To use GARY, you need a free Gemini API key. Head to the Settings tab and paste your key from **aistudio.google.com/app/apikey** — it's free and takes 30 seconds.",
+          timestamp: Date.now(),
+        };
+        const updatedMessages = [...newMessages, keyMsg];
+        setMessages(updatedMessages);
+        setIsLoading(false);
+        setIsRetrying(false);
         return;
       }
 
@@ -233,7 +420,7 @@ export default function ChatScreen() {
         id: generateId(),
         role: "assistant",
         content:
-          "Connection error. Check your signal and try again. I'm still here.",
+          "Connection issue. Check your signal and try again — I'm still here.",
         timestamp: Date.now(),
       };
       const updatedMessages = [...newMessages, errorMessage];
@@ -241,12 +428,15 @@ export default function ChatScreen() {
       await saveConversation(updatedMessages);
     } finally {
       setIsLoading(false);
+      setIsRetrying(false);
+      setHasImageRequest(false);
     }
   };
 
   const cancelRequest = () => {
     abortRef.current?.abort();
     setIsLoading(false);
+    setIsRetrying(false);
   };
 
   const renderMessage = useCallback(
@@ -313,25 +503,19 @@ export default function ChatScreen() {
         }
         ListFooterComponent={
           isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={theme.accent} />
-              <Text
-                style={[
-                  styles.loadingText,
-                  { color: theme.textSecondary, fontFamily: Fonts.mono },
-                ]}
-              >
-                processing...
-              </Text>
+            <View style={styles.loadingWrapper}>
+              <RecalibratingIndicator visible={isRetrying} />
+              <LoadingDots isImage={hasImageRequest && !isRetrying} />
               <Pressable
                 onPress={cancelRequest}
                 style={({ pressed }) => ({
-                  opacity: pressed ? 0.4 : 0.7,
+                  opacity: pressed ? 0.4 : 0.6,
                   padding: Spacing.xs,
+                  marginLeft: Spacing.sm,
                 })}
                 testID="button-cancel"
               >
-                <Feather name="x" size={13} color={theme.textSecondary} />
+                <Feather name="x-circle" size={14} color={theme.textSecondary} />
               </Pressable>
             </View>
           ) : null
@@ -344,7 +528,7 @@ export default function ChatScreen() {
             styles.imagePreviewBar,
             {
               backgroundColor: theme.backgroundSecondary,
-              borderTopColor: theme.border,
+              borderTopColor: "rgba(0, 170, 255, 0.12)",
             },
           ]}
         >
@@ -355,7 +539,7 @@ export default function ChatScreen() {
               { color: theme.textSecondary, fontFamily: Fonts.mono },
             ]}
           >
-            image attached
+            image attached — ready to analyze
           </Text>
           <Pressable
             onPress={() => setPendingImage(null)}
@@ -370,7 +554,7 @@ export default function ChatScreen() {
       <View style={styles.inputWrapper}>
         {Platform.OS === "ios" ? (
           <BlurView
-            intensity={60}
+            intensity={80}
             tint="dark"
             style={StyleSheet.absoluteFill}
           />
@@ -383,7 +567,7 @@ export default function ChatScreen() {
               backgroundColor:
                 Platform.OS === "ios"
                   ? "transparent"
-                  : "rgba(5, 8, 16, 0.92)",
+                  : "rgba(3, 5, 12, 0.95)",
               borderTopColor: "rgba(0, 170, 255, 0.12)",
             },
           ]}
@@ -407,7 +591,7 @@ export default function ChatScreen() {
             style={[
               styles.input,
               {
-                backgroundColor: "rgba(12, 18, 32, 0.8)",
+                backgroundColor: "rgba(10, 15, 28, 0.85)",
                 color: theme.text,
                 borderColor: "rgba(0, 170, 255, 0.15)",
                 fontFamily: Fonts.mono,
@@ -430,7 +614,7 @@ export default function ChatScreen() {
               {
                 backgroundColor: canSend
                   ? theme.accent
-                  : "rgba(0, 170, 255, 0.08)",
+                  : "rgba(0, 170, 255, 0.06)",
                 borderColor: canSend
                   ? theme.accent
                   : "rgba(0, 170, 255, 0.15)",
@@ -479,16 +663,58 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: Spacing.lg,
   },
+  loadingWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.lg,
+    paddingLeft: Spacing.lg,
+    gap: Spacing.xs,
+  },
   loadingContainer: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-start",
     gap: Spacing.sm,
-    paddingVertical: Spacing.lg,
-    paddingLeft: Spacing.lg,
   },
-  loadingText: {
+  loadingLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  loadingDots: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    borderLeftWidth: 2,
+    paddingLeft: Spacing.md,
+  },
+  dot: {
+    fontSize: 22,
+    lineHeight: 26,
+    fontFamily: "SpaceMono_700Bold",
+  },
+  loadingLabel: {
     fontSize: 12,
+    opacity: 0.8,
+  },
+  recalibrating: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  recalibIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: BorderRadius.xs,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recalibIconText: {
+    fontSize: 11,
+    color: "#000000",
+  },
+  recalibText: {
+    fontSize: 12,
+    flex: 1,
   },
   imagePreviewBar: {
     flexDirection: "row",
@@ -516,32 +742,34 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   iconBtn: {
-    width: 38,
-    height: 38,
+    width: 40,
+    height: 40,
     borderRadius: BorderRadius.xs,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+    marginBottom: 1,
   },
   input: {
     flex: 1,
-    minHeight: 38,
+    minHeight: 40,
     maxHeight: 110,
     borderRadius: BorderRadius.sm,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingVertical: 10,
     fontSize: 14,
     lineHeight: 20,
     borderWidth: 1,
   },
   sendButton: {
-    width: 38,
-    height: 38,
+    width: 40,
+    height: 40,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+    marginBottom: 1,
   },
 });
