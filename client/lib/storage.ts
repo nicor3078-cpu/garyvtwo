@@ -24,6 +24,7 @@ export async function getUserApiKey(): Promise<string | null> {
 }
 
 export async function setUserApiKey(key: string): Promise<void> {
+  await AsyncStorage.removeItem(KEYS.USER_API_KEY);
   await AsyncStorage.setItem(KEYS.USER_API_KEY, key.trim());
 }
 

@@ -1,8 +1,8 @@
 import { getUserApiKey, getMemoryVault } from "@/lib/storage";
 
 const CONFIG_URL =
-  "https://gist.githubusercontent.com/nicor3078-cpu/308f7d8ab992826693a264d9f9cf7fa2/raw/502019b4e650d57793628aedc2e703c0e6ea7ea6/gary_config.json";
-const DEFAULT_MODEL = "gemini-1.5-flash";
+  "https://gist.githubusercontent.com/nicor3078-cpu/308f7d8ab992826693a264d9f9cf7fa2/raw/664ab6664f701cecf3295a21f40dc303389e489c/gary_config.json";
+const DEFAULT_MODEL = "gemini-3.1-flash-lite-preview";
 
 let cachedModel: string | null = null;
 let configFetchedAt = 0;
