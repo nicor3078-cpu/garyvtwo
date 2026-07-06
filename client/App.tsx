@@ -6,6 +6,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
+import { Feather } from "@expo/vector-icons";
 import {
   useFonts,
   SpaceMono_400Regular,
@@ -24,6 +25,7 @@ export default function App() {
   const [fontsLoaded, fontError] = useFonts({
     SpaceMono_400Regular,
     SpaceMono_700Bold,
+    ...Feather.font,
   });
 
   useEffect(() => {
