@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "GARY",
-    "slug": "gary-decoder",
+    "name": "GARY V2",
+    "slug": "garyv2",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "gary",
+    "scheme": "garyv2",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourname.gary"
+      "bundleIdentifier": "com.garyv2.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +19,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.yourname.gary"
+      "package": "com.garyv2.app"
     },
     "web": {
       "output": "single",
