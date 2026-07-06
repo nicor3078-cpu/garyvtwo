@@ -6,15 +6,26 @@ async function logToSupabase(payload: {
   topic: string;
   student_name: string;
 }): Promise<void> {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_KEY;
+  const rawUrl = process.env.SUPABASE_URL;
+  const rawKey = process.env.SUPABASE_KEY;
 
-  if (!supabaseUrl || !supabaseKey) {
+  if (!rawUrl || !rawKey) {
     console.warn("SUPABASE_URL or SUPABASE_KEY not set — skipping log");
     return;
   }
 
-  const endpoint = `${supabaseUrl}/rest/v1/student_metrics`;
+  const supabaseUrl = rawUrl.replace(/[\s\u200B-\u200D\uFEFF]/g, "").replace(/\/+$/, "");
+  const supabaseKey = rawKey.replace(/[\s\u200B-\u200D\uFEFF]/g, "");
+
+  let endpoint: string;
+  try {
+    endpoint = new URL("/rest/v1/student_metrics", supabaseUrl).toString();
+  } catch (err) {
+    console.error(
+      `SUPABASE_URL is malformed after sanitization: "${supabaseUrl}" (original: "${rawUrl}")`,
+    );
+    throw err;
+  }
 
   const response = await fetch(endpoint, {
     method: "POST",
@@ -34,7 +45,8 @@ async function logToSupabase(payload: {
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    console.error(`Supabase log failed (${response.status}):`, text);
+    console.error(`Supabase log failed (${response.status}) at ${endpoint}:`, text);
+    throw new Error(`Supabase ${response.status}: ${text}`);
   }
 }
 
