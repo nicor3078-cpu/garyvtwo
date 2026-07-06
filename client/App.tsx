@@ -12,6 +12,9 @@ import {
   SpaceMono_400Regular,
   SpaceMono_700Bold,
 } from "@expo-google-fonts/space-mono";
+import { injectWebIconFont } from "@/lib/webIconFont";
+
+injectWebIconFont();
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
