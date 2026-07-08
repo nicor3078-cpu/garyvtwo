@@ -16,6 +16,15 @@ import { injectWebIconFont } from "@/lib/webIconFont";
 
 injectWebIconFont();
 
+import { createClient } from "@supabase/supabase-js";
+
+// Pulls your secure Vercel environment keys exactly as you named them
+const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseKey = process.env.SUPABASE_KEY || "";
+
+export const supabase = createClient(supabaseUrl, supabaseKey);
+
+
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
 

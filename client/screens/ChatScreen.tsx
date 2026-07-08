@@ -33,6 +33,8 @@ import {
   extractTopic,
 } from "@/lib/supabase";
 
+import { supabase } from "../../App";
+
 interface Conversation {
   id: string;
   title: string;
@@ -385,7 +387,20 @@ export default function ChatScreen() {
       const iqScore = calculateIQ(responseText);
       const topic = extractTopic(userMessage.content);
       const vault = await getMemoryVault();
-      logMinistryData(iqScore, topic, vault.name || "Anonymous");
+            const { data: dbData, error: dbError } = await supabase
+        .from('ministry_logs') 
+        .insert([
+          { 
+            student_name: vault.name || "Anonymous",
+            topic: topic, 
+            logic_score: iqScore,
+          }
+        ]);
+
+      if (dbError) {
+        console.error("Direct logging error:", dbError.message);
+      }
+
 
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
