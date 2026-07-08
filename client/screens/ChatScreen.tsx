@@ -388,7 +388,7 @@ export default function ChatScreen() {
       const topic = extractTopic(userMessage.content);
       const vault = await getMemoryVault();
             const { data: dbData, error: dbError } = await supabase
-        .from('ministry_logs') 
+        .from('student_metrics') 
         .insert([
           { 
             student_name: vault.name || "Anonymous",
