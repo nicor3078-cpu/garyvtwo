@@ -33,8 +33,6 @@ import {
   extractTopic,
 } from "@/lib/supabase";
 
-import { supabase } from "../../App";
-
 interface Conversation {
   id: string;
   title: string;
