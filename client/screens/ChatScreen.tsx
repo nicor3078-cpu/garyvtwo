@@ -387,20 +387,8 @@ export default function ChatScreen() {
       const iqScore = calculateIQ(responseText);
       const topic = extractTopic(userMessage.content);
       const vault = await getMemoryVault();
-            const { data: dbData, error: dbError } = await supabase
-        .from('student_metrics') 
-        .insert([
-          { 
-            student_name: vault.name || "Anonymous",
-            topic: topic, 
-            logic_score: iqScore,
-          }
-        ]);
 
-      if (dbError) {
-        console.error("Direct logging error:", dbError.message);
-      }
-
+logMinistryData(iqScore, topic, vault.name || "Anonymous");
 
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
