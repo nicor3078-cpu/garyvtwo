@@ -57,7 +57,7 @@ export default function SettingsScreen() {
   const loadData = async () => {
     const [key, vault] = await Promise.all([getUserApiKey(), getMemoryVault()]);
     setSavedApiKey(key);
-    if (key) setApiKey(key);
+    setApiKey("");
     setMemory(vault);
   };
 
@@ -70,6 +70,7 @@ export default function SettingsScreen() {
     if (valid) {
       await setUserApiKey(apiKey.trim());
       setSavedApiKey(apiKey.trim());
+      setApiKey("");
       setKeyStatus("valid");
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -197,6 +198,7 @@ export default function SettingsScreen() {
           }}
           autoCapitalize="none"
           autoCorrect={false}
+          secureTextEntry={true}
           testID="input-api-key"
         />
 
