@@ -23,7 +23,16 @@
     },
     "web": {
       "output": "single",
-      "favicon": "./assets/images/icon.png"
+      "favicon": "./assets/images/icon.png",
+      "name": "GARY V2",
+      "shortName": "GARY",
+      "description": "The Subject Decoder — Feynman Technique AI tutor",
+      "backgroundColor": "#000000",
+      "themeColor": "#000000",
+      "icon": "./assets/images/icon.png",
+      "splash": {
+        "backgroundColor": "#000000"
+      }
     },
     "plugins": [
       [
