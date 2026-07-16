@@ -80,8 +80,9 @@ export default function HistoryScreen() {
     return "No messages";
   };
 
-  const openConversation = (conversation: Conversation) => {
-    navigation.navigate("TopicDetail", { conversation });
+  const openConversation = async (conversation: Conversation) => {
+    await AsyncStorage.setItem(KEYS.CURRENT_CONVERSATION, conversation.id);
+    navigation.getParent()?.navigate("ChatTab" as never);
   };
 
   const renderItem = useCallback(
